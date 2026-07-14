@@ -144,6 +144,10 @@ form { display: grid; gap: 12px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 9px 8px; vertical-align: top; }
 th { color: var(--muted); font-size: 12px; white-space: nowrap; }
+td[data-label="Producer"],
+td[data-label="Wine"],
+td[data-label="Vintage"] { color: var(--ink); font-weight: 700; }
+td[data-label="Wine"] .hint { font-weight: 400; }
 tr:hover td { background: #fafafa; }
 .pill {
   display: inline-flex;
