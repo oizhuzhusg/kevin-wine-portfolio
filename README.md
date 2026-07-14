@@ -13,14 +13,16 @@ python3 server.py
 
 ## Cloudflare 部署
 
-生产版本使用 Cloudflare Workers、静态资源与 D1 数据库。首次部署会从 `seed-targets.json` 自动导入推荐清单。
+生产版本使用 Cloudflare Workers、静态资源与 D1 数据库。首次部署会从 `seed-targets.json` 自动导入推荐清单，首次 API 请求会自动建立数据表。
 
-```bash
-npx wrangler d1 create kevin-wine-portfolio
-# 将返回的 database_id 写入 wrangler.jsonc
-npx wrangler d1 migrations apply kevin-wine-portfolio --remote
-npx wrangler deploy
+在 Cloudflare 的 Workers & Pages 中通过 GitHub 导入本仓库。首次部署完成后，创建一个 D1 数据库并在 Worker 的 Settings > Bindings 中绑定：
+
+```text
+Variable name: DB
+D1 database: kevin-wine-portfolio
 ```
+
+随后重新部署或刷新应用即可完成初始化。
 
 ## MVP 功能
 

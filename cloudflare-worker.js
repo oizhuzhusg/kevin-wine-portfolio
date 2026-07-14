@@ -3,6 +3,30 @@ import seedTargets from "./seed-targets.json";
 const CATEGORIES = ["Drink Now", "Cellar", "Business", "Discovery"];
 const COLORS = ["red", "white", "sparkling", "sweet", "fortified"];
 let seedPromise;
+let schemaPromise;
+
+const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS portfolio_targets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, producer TEXT NOT NULL, wine_name TEXT NOT NULL,
+    region TEXT, country TEXT, color TEXT NOT NULL, recommended_vintages TEXT, avoid_vintages TEXT,
+    ideal_price_sgd REAL, max_price_sgd REAL, role TEXT NOT NULL DEFAULT 'Discovery',
+    stage TEXT NOT NULL DEFAULT 'Ready', status TEXT NOT NULL DEFAULT 'Wishlist', personal_score REAL,
+    would_buy_again TEXT, notes TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE (producer, wine_name))`,
+  `CREATE TABLE IF NOT EXISTS wines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, producer TEXT NOT NULL, wine_name TEXT NOT NULL,
+    region TEXT, country TEXT, appellation TEXT, vineyard_or_climat TEXT, classification TEXT,
+    grape_variety TEXT, color TEXT NOT NULL DEFAULT 'red', vintage INTEGER, drinking_window_start INTEGER,
+    drinking_window_end INTEGER, ideal_price_sgd REAL, max_price_sgd REAL,
+    current_inventory INTEGER NOT NULL DEFAULT 0, target_inventory INTEGER NOT NULL DEFAULT 1,
+    personal_score REAL, category_tags TEXT NOT NULL DEFAULT '[]', style_tags TEXT NOT NULL DEFAULT '[]',
+    notes TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE TABLE IF NOT EXISTS purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, wine_id INTEGER NOT NULL, purchase_date TEXT NOT NULL,
+    merchant TEXT, price_sgd REAL NOT NULL, quantity INTEGER NOT NULL, delivery_fee REAL NOT NULL DEFAULT 0,
+    total_cost REAL NOT NULL, purchase_reason TEXT, source_file_or_link TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP)`
+];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
@@ -15,6 +39,11 @@ const parseTags = (value) => {
 
 function wineFromRow(row) {
   return { ...row, category_tags: parseTags(row.category_tags), style_tags: parseTags(row.style_tags) };
+}
+
+async function ensureSchema(env) {
+  if (!schemaPromise) schemaPromise = env.DB.batch(SCHEMA_STATEMENTS.map(sql => env.DB.prepare(sql)));
+  await schemaPromise;
 }
 
 async function ensureTargets(env) {
@@ -133,7 +162,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
-      if (url.pathname.startsWith("/api/")) return await api(request, env, url.pathname);
+      if (url.pathname.startsWith("/api/")) {
+        if (!env.DB) return json({ error: "D1 database binding DB is not configured" }, 503);
+        await ensureSchema(env);
+        return await api(request, env, url.pathname);
+      }
       return env.ASSETS.fetch(request);
     } catch (error) {
       return json({ error: error.message || "Unexpected error" }, 500);
