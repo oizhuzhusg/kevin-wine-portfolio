@@ -79,7 +79,10 @@ async function loadLookups() {
     select.innerHTML = first + state.lookups.colors.map(c => `<option value="${c}">${c}</option>`).join("");
   }
   $("#filter-category").innerHTML = '<option value="">全部用途</option>' + state.lookups.categories.map(c => `<option value="${c}">${c}</option>`).join("");
-  $("#category-checkboxes").innerHTML = state.lookups.categories.map(c => `<label><input type="checkbox" name="category_tags" value="${c}" ${c === "Discovery" ? "checked" : ""}> ${c}</label>`).join("");
+  const categoryCheckboxes = $("#category-checkboxes");
+  if (categoryCheckboxes) {
+    categoryCheckboxes.innerHTML = state.lookups.categories.map(c => `<label><input type="checkbox" name="category_tags" value="${c}" ${c === "Discovery" ? "checked" : ""}> ${c}</label>`).join("");
+  }
 }
 
 async function loadWines() {
@@ -282,22 +285,6 @@ function wireEvents() {
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-status").addEventListener("change", renderPortfolioTargets);
-
-  $("#wine-form").addEventListener("submit", async event => {
-    event.preventDefault();
-    const payload = formDataToJson(event.currentTarget);
-    payload.category_tags = Array.isArray(payload.category_tags) ? payload.category_tags : payload.category_tags ? [payload.category_tags] : ["Discovery"];
-    payload.style_tags = String(payload.style_tags || "").split(",").map(s => s.trim()).filter(Boolean);
-    await api("/api/wines", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    event.currentTarget.reset();
-    $("#category-checkboxes input[value='Discovery']").checked = true;
-    toast("酒款已添加");
-    await refreshAll();
-  });
 
   $("#purchase-form").addEventListener("submit", async event => {
     event.preventDefault();

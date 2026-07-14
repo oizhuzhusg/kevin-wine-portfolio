@@ -54,41 +54,9 @@
             <select id="filter-category"><option value="">全部用途</option></select>
           </div>
         </div>
-        <div class="two-col">
-          <form id="wine-form" class="panel">
-            <h3>添加酒款</h3>
-            <div class="grid-form">
-              <label>Producer<input name="producer" required /></label>
-              <label>Wine Name<input name="wine_name" required /></label>
-              <label>Country<input name="country" /></label>
-              <label>Region<input name="region" /></label>
-              <label>Appellation<input name="appellation" /></label>
-              <label>Vineyard / Climat<input name="vineyard_or_climat" /></label>
-              <label>Classification<input name="classification" /></label>
-              <label>Grape<input name="grape_variety" /></label>
-              <label>Color<select name="color" required></select></label>
-              <label>Vintage<input name="vintage" type="number" min="1900" max="2100" /></label>
-              <label>Ideal SGD<input name="ideal_price_sgd" type="number" step="0.01" /></label>
-              <label>Max SGD<input name="max_price_sgd" type="number" step="0.01" /></label>
-              <label>Target Inventory<input name="target_inventory" type="number" min="0" value="1" /></label>
-              <label>Current Inventory<input name="current_inventory" type="number" min="0" value="0" /></label>
-              <label>Window Start<input name="drinking_window_start" type="number" min="1900" max="2200" /></label>
-              <label>Window End<input name="drinking_window_end" type="number" min="1900" max="2200" /></label>
-              <label>Role Reason<input name="portfolio_role_reason" /></label>
-              <label>Drink Now<input name="current_drinking_advice" /></label>
-              <label>Decanting<input name="decanting_advice" /></label>
-              <label>Wine Introduction<input name="wine_introduction" /></label>
-              <label>Priority<select name="personal_priority"><option>A</option><option selected>B</option><option>C</option><option>Avoid</option></select></label>
-              <label>Style Tags<input name="style_tags" placeholder="fruit_forward, balanced" /></label>
-            </div>
-            <fieldset id="category-checkboxes"></fieldset>
-            <label>Notes<textarea name="notes" rows="3"></textarea></label>
-            <button type="submit">添加酒款</button>
-          </form>
-          <div class="panel">
-            <h3>库存列表</h3>
-            <div id="inventory-table" class="table-wrap"></div>
-          </div>
+        <div class="panel">
+          <h3>库存列表</h3>
+          <div id="inventory-table" class="table-wrap"></div>
         </div>
       </section>
 
