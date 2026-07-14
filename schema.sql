@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS wines (
   current_inventory INTEGER DEFAULT 0,
   tasted_before INTEGER DEFAULT 0,
   personal_score REAL,
+  portfolio_role_reason TEXT,
+  wine_introduction TEXT,
+  current_drinking_advice TEXT,
+  decanting_advice TEXT,
   notes TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP

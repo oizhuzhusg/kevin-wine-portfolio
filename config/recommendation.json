@@ -40,6 +40,16 @@
     "A": 58,
     "B": 38,
     "C": 18
+  },
+  "inventory_assistant": {
+    "classification_order": ["Drink Now", "Business", "Cellar", "Discovery"],
+    "classification_rules": {
+      "Drink Now": "近期处于适饮期，适合日常分享或建立品饮记录。",
+      "Business": "品质、辨识度与即饮表现兼具，适合重要聚会或宴请。",
+      "Cellar": "尚未到最佳状态或具有明显陈年潜力，优先留存。",
+      "Discovery": "用于验证生产者、产区、品种或风格，首次默认只买一瓶。"
+    },
+    "service_policy": "每次新入库都必须记录最佳适饮区间、当前饮用建议与醒酒方式；若已在最佳期，明确标注可即饮。",
+    "palate_priority": ["果味清晰", "整体平衡", "细腻单宁", "酸度作为支撑", "余味与完成度"]
   }
 }
-

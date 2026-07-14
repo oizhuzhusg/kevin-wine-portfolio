@@ -19,13 +19,22 @@ const SCHEMA_STATEMENTS = [
     grape_variety TEXT, color TEXT NOT NULL DEFAULT 'red', vintage INTEGER, drinking_window_start INTEGER,
     drinking_window_end INTEGER, ideal_price_sgd REAL, max_price_sgd REAL,
     current_inventory INTEGER NOT NULL DEFAULT 0, target_inventory INTEGER NOT NULL DEFAULT 1,
-    personal_score REAL, category_tags TEXT NOT NULL DEFAULT '[]', style_tags TEXT NOT NULL DEFAULT '[]',
+    personal_score REAL, portfolio_role_reason TEXT, wine_introduction TEXT,
+    current_drinking_advice TEXT, decanting_advice TEXT,
+    category_tags TEXT NOT NULL DEFAULT '[]', style_tags TEXT NOT NULL DEFAULT '[]',
     notes TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
   `CREATE TABLE IF NOT EXISTS purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT, wine_id INTEGER NOT NULL, purchase_date TEXT NOT NULL,
     merchant TEXT, price_sgd REAL NOT NULL, quantity INTEGER NOT NULL, delivery_fee REAL NOT NULL DEFAULT 0,
     total_cost REAL NOT NULL, purchase_reason TEXT, source_file_or_link TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP)`
+];
+
+const WINE_COLUMN_UPDATES = [
+  "ALTER TABLE wines ADD COLUMN portfolio_role_reason TEXT",
+  "ALTER TABLE wines ADD COLUMN wine_introduction TEXT",
+  "ALTER TABLE wines ADD COLUMN current_drinking_advice TEXT",
+  "ALTER TABLE wines ADD COLUMN decanting_advice TEXT"
 ];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
@@ -42,7 +51,15 @@ function wineFromRow(row) {
 }
 
 async function ensureSchema(env) {
-  if (!schemaPromise) schemaPromise = env.DB.batch(SCHEMA_STATEMENTS.map(sql => env.DB.prepare(sql)));
+  if (!schemaPromise) {
+    schemaPromise = (async () => {
+      await env.DB.batch(SCHEMA_STATEMENTS.map(sql => env.DB.prepare(sql)));
+      for (const sql of WINE_COLUMN_UPDATES) {
+        try { await env.DB.prepare(sql).run(); }
+        catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
+      }
+    })();
+  }
   await schemaPromise;
 }
 
@@ -123,7 +140,7 @@ async function api(request, env, pathname) {
   if (pathname === "/api/wines" && request.method === "GET") return json((await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow));
   if (pathname === "/api/wines" && request.method === "POST") {
     const body = await requestBody(request);
-    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "notes"];
+    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const values = fields.map(field => body[field] ?? null);
     values[0] ||= "Unknown"; values[1] ||= "Unnamed wine"; values[8] ||= "red";
     const result = await env.DB.prepare(`INSERT INTO wines (${fields.join(",")}, category_tags, style_tags) VALUES (${fields.map(() => "?").join(",")}, ?, ?)`)
@@ -133,7 +150,7 @@ async function api(request, env, pathname) {
   const wineMatch = pathname.match(/^\/api\/wines\/(\d+)$/);
   if (wineMatch && request.method === "PATCH") {
     const body = await requestBody(request);
-    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "notes"];
+    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const entries = Object.entries(body).filter(([key]) => allowed.includes(key));
     if (body.category_tags) entries.push(["category_tags", JSON.stringify(body.category_tags)]);
     if (body.style_tags) entries.push(["style_tags", JSON.stringify(body.style_tags)]);

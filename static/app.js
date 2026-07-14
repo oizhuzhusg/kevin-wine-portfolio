@@ -147,9 +147,12 @@ function renderInventory() {
     { label: "Color", key: "color" },
     { label: "Vintage", key: "vintage" },
     { label: "Use", render: r => r.category_tags.map(t => `<span class="tag">${t}</span>`).join("") },
+    { label: "Profile", render: r => `<span class="hint">${escapeHtml(r.portfolio_role_reason || "")}<br>${escapeHtml(r.wine_introduction || "")}</span>` },
     { label: "Rating", render: r => starRating(r.id, r.personal_score) },
     { label: "Inventory", render: r => `<input class="inline-inventory" data-id="${r.id}" type="number" min="0" value="${r.current_inventory || 0}" />` },
     { label: "Target", key: "target_inventory" },
+    { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
+    { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
     { label: "Ideal", render: r => money(r.ideal_price_sgd) },
     { label: "Max", render: r => money(r.max_price_sgd) }
   ], rows);

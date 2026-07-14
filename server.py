@@ -281,9 +281,22 @@ def init_db():
     first = not DB_PATH.exists()
     with db() as conn:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        ensure_wine_columns(conn)
         if first or conn.execute("SELECT COUNT(*) FROM producer_watchlist").fetchone()[0] == 0:
             seed(conn)
         seed_portfolio_targets(conn)
+
+
+def ensure_wine_columns(conn):
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(wines)")}
+    for name, definition in {
+        "portfolio_role_reason": "TEXT",
+        "wine_introduction": "TEXT",
+        "current_drinking_advice": "TEXT",
+        "decanting_advice": "TEXT",
+    }.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE wines ADD COLUMN {name} {definition}")
 
 
 def seed_portfolio_targets(conn):
@@ -859,7 +872,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def create_wine(conn, payload):
-    fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "bottle_size", "alcohol", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "personal_priority", "target_inventory", "current_inventory", "tasted_before", "personal_score", "notes"]
+    fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "bottle_size", "alcohol", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "personal_priority", "target_inventory", "current_inventory", "tasted_before", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"]
     data = {f: payload.get(f) for f in fields}
     data["color"] = data["color"] or "red"
     data["producer"] = data["producer"] or "Unknown"
