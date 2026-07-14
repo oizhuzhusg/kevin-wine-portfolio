@@ -7,5 +7,12 @@
     "directory": "./static",
     "binding": "ASSETS",
     "run_worker_first": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kevin-wine-portfolio",
+      "database_id": "a587025c-a4a3-43c1-b111-3f94f7b048de"
+    }
+  ]
 }
