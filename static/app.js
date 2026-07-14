@@ -207,6 +207,15 @@ function starRating(wineId, score) {
 
 async function renderPurchases() {
   state.purchases = await api("/api/purchases");
+  renderPurchaseTable();
+}
+
+function renderPurchaseTable() {
+  const query = normalize($("#purchase-search").value);
+  const rows = state.purchases.filter(purchase => {
+    const text = normalize(`${purchase.producer} ${purchase.wine_name} ${purchase.vintage} ${purchase.merchant}`);
+    return !query || text.includes(query);
+  });
   renderTable($("#purchase-table"), [
     { label: "Date", key: "purchase_date" },
     { label: "Wine", render: r => `${r.producer} - ${r.wine_name}<br><span class="hint">${r.vintage || ""}</span>` },
@@ -215,7 +224,7 @@ async function renderPurchases() {
     { label: "Qty", key: "quantity" },
     { label: "Total", render: r => money(r.total_cost) },
     { label: "Reason", key: "purchase_reason" }
-  ], state.purchases);
+  ], rows);
 }
 
 async function loadPortfolioTargets() {
@@ -295,6 +304,7 @@ function wireEvents() {
   $("#filter-color").addEventListener("change", renderInventory);
   $("#filter-category").addEventListener("change", renderInventory);
   $("#inventory-sort").addEventListener("change", renderInventory);
+  $("#purchase-search").addEventListener("input", renderPurchaseTable);
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
