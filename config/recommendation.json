@@ -51,5 +51,20 @@
     },
     "service_policy": "每次新入库都必须记录最佳适饮区间、当前饮用建议与醒酒方式；若已在最佳期，明确标注可即饮。",
     "palate_priority": ["果味清晰", "整体平衡", "细腻单宁", "酸度作为支撑", "余味与完成度"]
+  },
+  "purchase_costing_policy": {
+    "unit_of_record": "所有采购成本均以每瓶最终到手价记录，同时保留订单总额与各项分摊明细。",
+    "channel_rule": "不同渠道必须使用各自的成本模型；不得把一个渠道的运费、税费、保险或本地配送规则套用到另一个渠道。",
+    "cru_uk_to_singapore": {
+      "label": "Cru UK → Singapore",
+      "known_case_freight_sgd": 58.4,
+      "freight_note": "当前为用户提供的单箱预估国际转运费；须以实际订单、箱型和运输方式确认。",
+      "tax_rule": "酒税按实际瓶装容量与 ABV 计算；GST 按酒价、国际转运、酒税及实际相关费用计算。",
+      "local_delivery_rule": "Cru 新加坡本地送货费用须按当次订单门槛和实际结算确认。"
+    },
+    "bi": {
+      "label": "BI",
+      "rule": "使用 BI 当次报价或其独立运输、保险、税费与本地配送规则计算；不得使用 Cru 的 SG$58.40/箱转运估算。"
+    }
   }
 }
