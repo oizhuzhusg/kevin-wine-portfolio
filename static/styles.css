@@ -245,12 +245,14 @@ code { background: #eceff3; padding: 2px 4px; border-radius: 4px; }
   table, tbody, tr, td { display: block; width: 100%; }
   table { font-size: 13px; }
   thead { display: none; }
-  tbody { display: grid; gap: 10px; }
+  tbody { display: grid; gap: 14px; }
   tr {
-    border: 1px solid var(--line);
+    border: 1px solid #c5ced8;
+    border-left: 3px solid var(--accent);
     border-radius: var(--radius);
     overflow: hidden;
     background: #fff;
+    box-shadow: 0 2px 6px rgba(32, 33, 36, 0.06);
   }
   tr:hover td { background: transparent; }
   td {
