@@ -172,6 +172,7 @@ function renderInventory() {
     { label: "参考理想价", render: r => money(r.ideal_price_sgd) },
     { label: "最高可接受价", render: r => money(r.max_price_sgd) }
   ], rows);
+  renderMobileInventory(rows);
   $$(".inline-inventory").forEach(input => {
     input.addEventListener("change", async () => {
       await api(`/api/wines/${input.dataset.id}`, {
@@ -194,6 +195,42 @@ function renderInventory() {
       await refreshAll();
     });
   });
+}
+
+function renderMobileInventory(rows) {
+  const year = new Date().getFullYear();
+  $("#inventory-mobile-list").innerHTML = rows.map(wine => {
+    const window = `${wine.drinking_window_start || "-"}-${wine.drinking_window_end || "-"}`;
+    const drinkingStatus = !wine.drinking_window_start || !wine.drinking_window_end
+      ? "适饮期待补充"
+      : wine.drinking_window_start > year
+        ? `${wine.drinking_window_start} 起适饮`
+        : wine.drinking_window_end < year
+          ? "已过主要适饮期"
+          : "现在适饮";
+    return `
+      <details class="inventory-mobile-card">
+        <summary>
+          <span class="mobile-wine-producer">${escapeHtml(wine.producer)}</span>
+          <span class="mobile-wine-name">${escapeHtml(wine.wine_name)}</span>
+          <span class="mobile-wine-meta">${wine.vintage || "-"} · ${escapeHtml(wine.appellation || wine.region || "")}</span>
+          <span class="mobile-wine-tags">${wine.category_tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</span>
+          <span class="mobile-window-status">${drinkingStatus}</span>
+        </summary>
+        <div class="mobile-wine-details">
+          <div class="mobile-detail-row"><span>最佳适饮期</span><strong>${window}</strong></div>
+          <div class="mobile-detail-row"><span>库存 / 目标</span><span><input class="inline-inventory" data-id="${wine.id}" type="number" min="0" value="${wine.current_inventory || 0}" /> / ${wine.target_inventory || 0}</span></div>
+          <div class="mobile-detail-row"><span>评分</span>${starRating(wine.id, wine.personal_score)}</div>
+          <div class="mobile-detail-block"><span>酒款定位</span><p>${escapeHtml(wine.portfolio_role_reason || "-")}</p></div>
+          <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
+          <div class="mobile-detail-block"><span>现在怎么喝</span><p>${escapeHtml(wine.current_drinking_advice || "-")}</p></div>
+          <div class="mobile-detail-block"><span>醒酒建议</span><p>${escapeHtml(wine.decanting_advice || "-")}</p></div>
+          <div class="mobile-detail-row"><span>参考理想价</span><strong>${money(wine.ideal_price_sgd)}</strong></div>
+          <div class="mobile-detail-row"><span>最高可接受价</span><strong>${money(wine.max_price_sgd)}</strong></div>
+        </div>
+      </details>
+    `;
+  }).join("");
 }
 
 function starRating(wineId, score) {
