@@ -1,0 +1,325 @@
+const state = {
+  wines: [],
+  lookups: { categories: [], colors: [] },
+  purchases: [],
+  portfolioTargets: []
+};
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+function money(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  return `SGD ${Number(value).toFixed(0)}`;
+}
+
+function pct(value) {
+  return `${Math.round((value || 0) * 100)}%`;
+}
+
+function toast(message) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+}
+
+function formDataToJson(form) {
+  const data = new FormData(form);
+  const obj = {};
+  for (const [key, value] of data.entries()) {
+    if (obj[key] !== undefined) {
+      obj[key] = Array.isArray(obj[key]) ? [...obj[key], value] : [obj[key], value];
+    } else {
+      obj[key] = value;
+    }
+  }
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === "") obj[key] = null;
+    if (["vintage", "drinking_window_start", "drinking_window_end", "target_inventory", "current_inventory", "quantity", "wine_id"].includes(key) && obj[key] !== null) {
+      obj[key] = Number.parseInt(obj[key], 10);
+    }
+    if (["ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "price_sgd", "delivery_fee", "total_cost", "personal_score", "alcohol"].includes(key) && obj[key] !== null) {
+      obj[key] = Number.parseFloat(obj[key]);
+    }
+  }
+  return obj;
+}
+
+function gradeBadge(grade) {
+  return `<span class="pill grade-${grade}">${grade}</span>`;
+}
+
+function renderTable(container, columns, rows) {
+  if (!rows.length) {
+    container.innerHTML = `<p class="hint">暂无数据</p>`;
+    return;
+  }
+  container.innerHTML = `
+    <table>
+      <thead><tr>${columns.map(c => `<th>${c.label}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows.map(row => `<tr>${columns.map(c => `<td>${c.render ? c.render(row) : (row[c.key] ?? "-")}</td>`).join("")}</tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+async function loadLookups() {
+  state.lookups = await api("/api/lookups");
+  for (const select of $$('select[name="color"], #filter-color')) {
+    const first = select.id === "filter-color" ? '<option value="">全部颜色</option>' : "";
+    select.innerHTML = first + state.lookups.colors.map(c => `<option value="${c}">${c}</option>`).join("");
+  }
+  $("#filter-category").innerHTML = '<option value="">全部用途</option>' + state.lookups.categories.map(c => `<option value="${c}">${c}</option>`).join("");
+  $("#category-checkboxes").innerHTML = state.lookups.categories.map(c => `<label><input type="checkbox" name="category_tags" value="${c}" ${c === "Discovery" ? "checked" : ""}> ${c}</label>`).join("");
+}
+
+async function loadWines() {
+  state.wines = await api("/api/wines");
+  renderInventory();
+  const purchaseSelect = $('#purchase-form select[name="wine_id"]');
+  purchaseSelect.innerHTML = state.wines.map(w => `<option value="${w.id}">${w.producer} - ${w.wine_name} ${w.vintage || ""}</option>`).join("");
+}
+
+async function renderDashboard() {
+  const data = await api("/api/dashboard");
+  const colorTargets = data.targets.color_targets;
+  const catTargets = data.targets.category_targets;
+  $("#dashboard-content").innerHTML = `
+    <div class="metric-grid">
+      <div class="metric">总库存<strong>${data.total_bottles}</strong></div>
+      <div class="metric">库存总成本<strong>${money(data.total_cost)}</strong></div>
+      <div class="metric">平均单瓶成本<strong>${money(data.average_bottle_cost)}</strong></div>
+      <div class="metric">补货类别<strong>${data.replenish.map(r => r.category).join(", ") || "结构健康"}</strong></div>
+    </div>
+    <div class="bars">
+      <div class="panel">
+        <h3>红白比例</h3>
+        ${Object.entries(colorTargets).map(([color, target]) => bar(color, data.color_percentages[color], target, data.color_counts[color])).join("")}
+      </div>
+      <div class="panel">
+        <h3>用途分类</h3>
+        ${Object.entries(catTargets).map(([cat, target]) => bar(cat, data.category_percentages[cat], target, data.category_counts[cat])).join("")}
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>即将进入适饮期</h3>
+      <div class="table-wrap" id="window-table"></div>
+    </div>
+  `;
+  renderTable($("#window-table"), [
+    { label: "Producer", key: "producer" },
+    { label: "Wine", key: "wine_name" },
+    { label: "Vintage", key: "vintage" },
+    { label: "Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
+    { label: "Inventory", key: "current_inventory" }
+  ], data.entering_window);
+}
+
+function bar(label, current, target, count) {
+  return `
+    <div class="bar-row">
+      <div class="bar-label"><span>${label} (${count || 0})</span><span>${pct(current)} / target ${pct(target)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.round((current || 0) * 100))}%"></div></div>
+    </div>
+  `;
+}
+
+function renderInventory() {
+  const q = normalize($("#inventory-search").value);
+  const color = $("#filter-color").value;
+  const category = $("#filter-category").value;
+  const rows = state.wines.filter(w => {
+    const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
+    return (!q || text.includes(q)) && (!color || w.color === color) && (!category || w.category_tags.includes(category));
+  });
+  renderTable($("#inventory-table"), [
+    { label: "Producer", key: "producer" },
+    { label: "Wine", render: r => `${r.wine_name}<br><span class="hint">${r.appellation || r.region || ""}</span>` },
+    { label: "Color", key: "color" },
+    { label: "Vintage", key: "vintage" },
+    { label: "Use", render: r => r.category_tags.map(t => `<span class="tag">${t}</span>`).join("") },
+    { label: "Rating", render: r => starRating(r.id, r.personal_score) },
+    { label: "Inventory", render: r => `<input class="inline-inventory" data-id="${r.id}" type="number" min="0" value="${r.current_inventory || 0}" />` },
+    { label: "Target", key: "target_inventory" },
+    { label: "Ideal", render: r => money(r.ideal_price_sgd) },
+    { label: "Max", render: r => money(r.max_price_sgd) }
+  ], rows);
+  $$(".inline-inventory").forEach(input => {
+    input.addEventListener("change", async () => {
+      await api(`/api/wines/${input.dataset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_inventory: Number.parseInt(input.value, 10) || 0 })
+      });
+      toast("库存已更新");
+      await refreshAll();
+    });
+  });
+  $$(".star").forEach(button => {
+    button.addEventListener("click", async () => {
+      await api(`/api/wines/${button.dataset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personal_score: Number.parseInt(button.dataset.value, 10) })
+      });
+      toast("评分已更新");
+      await refreshAll();
+    });
+  });
+}
+
+function starRating(wineId, score) {
+  const rating = Math.max(0, Math.min(5, Math.round(Number(score || 0))));
+  return `
+    <span class="star-rating" aria-label="${rating} of 5 stars">
+      ${[1, 2, 3, 4, 5].map(value => `<button class="star ${value <= rating ? "filled" : ""}" data-id="${wineId}" data-value="${value}" title="${value} 星" type="button">★</button>`).join("")}
+    </span>
+  `;
+}
+
+async function renderPurchases() {
+  state.purchases = await api("/api/purchases");
+  renderTable($("#purchase-table"), [
+    { label: "Date", key: "purchase_date" },
+    { label: "Wine", render: r => `${r.producer} - ${r.wine_name}<br><span class="hint">${r.vintage || ""}</span>` },
+    { label: "Merchant", key: "merchant" },
+    { label: "Price", render: r => money(r.price_sgd) },
+    { label: "Qty", key: "quantity" },
+    { label: "Total", render: r => money(r.total_cost) },
+    { label: "Reason", key: "purchase_reason" }
+  ], state.purchases);
+}
+
+async function loadPortfolioTargets() {
+  state.portfolioTargets = await api("/api/portfolio-targets");
+  const regionSelect = $("#recommendation-region");
+  const selectedRegion = regionSelect.value;
+  const regions = [...new Set(state.portfolioTargets.map(target => target.region).filter(Boolean))].sort();
+  regionSelect.innerHTML = '<option value="">全部产区</option>' + regions.map(region => `<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`).join("");
+  regionSelect.value = regions.includes(selectedRegion) ? selectedRegion : "";
+  renderPortfolioTargets();
+}
+
+function targetStatusLabel(status) {
+  return { Wishlist: "待尝试", Purchased: "已购买", Tasted: "已喝", Approved: "会回购", Archived: "不再关注" }[status] || status;
+}
+
+function renderPortfolioTargets() {
+  const query = normalize($("#recommendation-search").value);
+  const region = $("#recommendation-region").value;
+  const color = $("#recommendation-color").value;
+  const status = $("#recommendation-status").value;
+  const rows = state.portfolioTargets.filter(target => {
+    const text = normalize(`${target.producer} ${target.wine_name} ${target.region} ${target.country}`);
+    return (!query || text.includes(query)) && (!region || target.region === region) && (!color || target.color === color) && (!status || target.status === status);
+  });
+  const tasted = state.portfolioTargets.filter(target => target.status === "Tasted").length;
+  const approved = state.portfolioTargets.filter(target => target.status === "Approved").length;
+  $("#recommendation-summary").innerHTML = `<span>${state.portfolioTargets.length} 推荐</span><span>${new Set(state.portfolioTargets.map(target => target.region)).size} 个产区</span><span>${tasted} 已喝</span><span>${approved} 会回购</span>`;
+  renderTable($("#recommendation-table"), [
+    { label: "Producer", key: "producer" },
+    { label: "Wine", render: target => `${target.wine_name}<br><span class="hint">${target.region || ""}</span>` },
+    { label: "Region", key: "region" },
+    { label: "Color", render: target => target.color === "red" ? "红" : target.color === "white" ? "白" : target.color },
+    { label: "Recommended", render: target => target.recommended_vintages || "-" },
+    { label: "Target Price", render: target => `${money(target.ideal_price_sgd)}-${money(target.max_price_sgd)}` },
+    { label: "Role", key: "role" },
+    { label: "Status", render: target => `<select class="target-status" data-id="${target.id}">${["Wishlist", "Purchased", "Tasted", "Approved", "Archived"].map(value => `<option value="${value}" ${value === target.status ? "selected" : ""}>${targetStatusLabel(value)}</option>`).join("")}</select>` },
+    { label: "Score", render: target => `<input class="target-score" data-id="${target.id}" type="number" min="0" max="10" step="0.5" value="${target.personal_score ?? ""}" placeholder="-" />` },
+    { label: "Notes", render: target => `<textarea class="target-notes" data-id="${target.id}" rows="2" placeholder="品饮笔记">${escapeHtml(target.notes || "")}</textarea>` }
+  ], rows);
+  $$(".target-status").forEach(input => input.addEventListener("change", () => updatePortfolioTarget(input.dataset.id, { status: input.value }, "状态已更新")));
+  $$(".target-score").forEach(input => input.addEventListener("change", () => updatePortfolioTarget(input.dataset.id, { personal_score: input.value === "" ? null : Number.parseFloat(input.value) }, "评分已更新")));
+  $$(".target-notes").forEach(input => input.addEventListener("change", () => updatePortfolioTarget(input.dataset.id, { notes: input.value }, "笔记已更新")));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+}
+
+async function updatePortfolioTarget(id, payload, message) {
+  try {
+    await api(`/api/portfolio-targets/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    toast(message);
+    await loadPortfolioTargets();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function normalize(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ").trim();
+}
+
+async function refreshAll() {
+  await Promise.all([renderDashboard(), loadWines(), renderPurchases(), loadPortfolioTargets()]);
+}
+
+function wireEvents() {
+  $$(".tab").forEach(tab => tab.addEventListener("click", () => {
+    $$(".tab").forEach(t => t.classList.remove("active"));
+    $$(".view").forEach(v => v.classList.remove("active"));
+    tab.classList.add("active");
+    $(`#${tab.dataset.view}`).classList.add("active");
+  }));
+  $('[data-action="refresh"]').addEventListener("click", refreshAll);
+  $("#inventory-search").addEventListener("input", renderInventory);
+  $("#filter-color").addEventListener("change", renderInventory);
+  $("#filter-category").addEventListener("change", renderInventory);
+  $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
+  $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
+  $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
+  $("#recommendation-status").addEventListener("change", renderPortfolioTargets);
+
+  $("#wine-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const payload = formDataToJson(event.currentTarget);
+    payload.category_tags = Array.isArray(payload.category_tags) ? payload.category_tags : payload.category_tags ? [payload.category_tags] : ["Discovery"];
+    payload.style_tags = String(payload.style_tags || "").split(",").map(s => s.trim()).filter(Boolean);
+    await api("/api/wines", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    event.currentTarget.reset();
+    $("#category-checkboxes input[value='Discovery']").checked = true;
+    toast("酒款已添加");
+    await refreshAll();
+  });
+
+  $("#purchase-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    await api("/api/purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formDataToJson(event.currentTarget))
+    });
+    event.currentTarget.reset();
+    $('#purchase-form input[name="quantity"]').value = 1;
+    $('#purchase-form input[name="delivery_fee"]').value = 0;
+    toast("购买已记录，库存已增加");
+    await refreshAll();
+  });
+}
+
+async function boot() {
+  try {
+    await loadLookups();
+    wireEvents();
+    await refreshAll();
+  } catch (error) {
+    toast(error.message);
+    console.error(error);
+  }
+}
+
+boot();

@@ -1,0 +1,45 @@
+{
+  "color_targets": {
+    "red": 0.7,
+    "white": 0.3
+  },
+  "category_targets": {
+    "Drink Now": 0.3,
+    "Cellar": 0.3,
+    "Business": 0.2,
+    "Discovery": 0.2
+  },
+  "main_budget_sgd": {
+    "min": 100,
+    "max": 300
+  },
+  "premium_budget_requires": ["Business", "Cellar"],
+  "preferred_regions": ["Burgundy", "Bordeaux", "Rhône", "Rhone", "Napa", "Rioja"],
+  "positive_style_tags": ["fruit_forward", "balanced", "rich", "structured", "mineral"],
+  "negative_style_tags": ["lean", "oxidative", "natural", "volatile_acidity", "sharp", "too_acidic"],
+  "financialized_producers": ["DRC", "Domaine de la Romanée-Conti", "Leroy", "Roumier", "Rousseau", "Arnoux-Lachaux"],
+  "weights": {
+    "watchlist": 30,
+    "known_wine_match": 18,
+    "buy_list_match": 20,
+    "preferred_region": 8,
+    "positive_style": 6,
+    "negative_style": -14,
+    "below_ideal_price": 24,
+    "below_max_price": 10,
+    "above_max_price": -28,
+    "inventory_gap": 16,
+    "color_need": 8,
+    "category_need": 8,
+    "weak_grand_cru_penalty": -18,
+    "financialized_penalty": -20,
+    "premium_without_reason_penalty": -10
+  },
+  "grade_thresholds": {
+    "S": 78,
+    "A": 58,
+    "B": 38,
+    "C": 18
+  }
+}
+

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kevin Wine Portfolio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Kevin Wine Portfolio</h1>
+        <p>个人酒窖库存、购买记录与 1-5 星偏好管理</p>
+      </div>
+      <nav class="tabs" aria-label="Primary">
+        <button class="tab active" data-view="dashboard">Dashboard</button>
+        <button class="tab" data-view="recommendations">Recommended</button>
+        <button class="tab" data-view="inventory">Inventory</button>
+        <button class="tab" data-view="purchases">Purchases</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="dashboard" class="view active">
+        <div class="toolbar">
+          <h2>Dashboard</h2>
+          <button data-action="refresh">刷新</button>
+        </div>
+        <div id="dashboard-content"></div>
+      </section>
+
+      <section id="recommendations" class="view">
+        <div class="toolbar">
+          <h2>Recommended Wines</h2>
+          <div class="filters">
+            <input id="recommendation-search" placeholder="搜索生产者、酒款、产区" />
+            <select id="recommendation-region"><option value="">全部产区</option></select>
+            <select id="recommendation-color"><option value="">全部颜色</option><option value="red">红</option><option value="white">白</option></select>
+            <select id="recommendation-status"><option value="">全部状态</option><option value="Wishlist">待尝试</option><option value="Purchased">已购买</option><option value="Tasted">已喝</option><option value="Approved">会回购</option><option value="Archived">不再关注</option></select>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="recommendation-summary" class="recommendation-summary"></div>
+          <div id="recommendation-table" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="inventory" class="view">
+        <div class="toolbar">
+          <h2>Inventory</h2>
+          <div class="filters">
+            <input id="inventory-search" placeholder="搜索生产者、酒款、产区" />
+            <select id="filter-color"><option value="">全部颜色</option></select>
+            <select id="filter-category"><option value="">全部用途</option></select>
+          </div>
+        </div>
+        <div class="two-col">
+          <form id="wine-form" class="panel">
+            <h3>添加酒款</h3>
+            <div class="grid-form">
+              <label>Producer<input name="producer" required /></label>
+              <label>Wine Name<input name="wine_name" required /></label>
+              <label>Country<input name="country" /></label>
+              <label>Region<input name="region" /></label>
+              <label>Appellation<input name="appellation" /></label>
+              <label>Vineyard / Climat<input name="vineyard_or_climat" /></label>
+              <label>Classification<input name="classification" /></label>
+              <label>Grape<input name="grape_variety" /></label>
+              <label>Color<select name="color" required></select></label>
+              <label>Vintage<input name="vintage" type="number" min="1900" max="2100" /></label>
+              <label>Ideal SGD<input name="ideal_price_sgd" type="number" step="0.01" /></label>
+              <label>Max SGD<input name="max_price_sgd" type="number" step="0.01" /></label>
+              <label>Target Inventory<input name="target_inventory" type="number" min="0" value="1" /></label>
+              <label>Current Inventory<input name="current_inventory" type="number" min="0" value="0" /></label>
+              <label>Window Start<input name="drinking_window_start" type="number" min="1900" max="2200" /></label>
+              <label>Window End<input name="drinking_window_end" type="number" min="1900" max="2200" /></label>
+              <label>Priority<select name="personal_priority"><option>A</option><option selected>B</option><option>C</option><option>Avoid</option></select></label>
+              <label>Style Tags<input name="style_tags" placeholder="fruit_forward, balanced" /></label>
+            </div>
+            <fieldset id="category-checkboxes"></fieldset>
+            <label>Notes<textarea name="notes" rows="3"></textarea></label>
+            <button type="submit">添加酒款</button>
+          </form>
+          <div class="panel">
+            <h3>库存列表</h3>
+            <div id="inventory-table" class="table-wrap"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="purchases" class="view">
+        <div class="toolbar"><h2>Purchases</h2></div>
+        <div class="two-col">
+          <form id="purchase-form" class="panel">
+            <h3>记录购买</h3>
+            <div class="grid-form">
+              <label>Wine<select name="wine_id" required></select></label>
+              <label>Date<input name="purchase_date" type="date" required /></label>
+              <label>Merchant<input name="merchant" /></label>
+              <label>Price / Bottle SGD<input name="price_sgd" type="number" min="0" step="0.01" required /></label>
+              <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label>
+              <label>Delivery Fee<input name="delivery_fee" type="number" min="0" step="0.01" value="0" /></label>
+              <label>Total Cost<input name="total_cost" type="number" min="0" step="0.01" placeholder="留空自动计算" /></label>
+              <label>Source<input name="source_file_or_link" placeholder="订单链接 / 文件名" /></label>
+            </div>
+            <label>Purchase Reason<textarea name="purchase_reason" rows="3"></textarea></label>
+            <button type="submit">保存购买并增加库存</button>
+          </form>
+          <div class="panel">
+            <h3>购买历史</h3>
+            <div id="purchase-table" class="table-wrap"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <div id="toast" role="status"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
