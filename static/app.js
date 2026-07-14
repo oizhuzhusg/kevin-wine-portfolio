@@ -66,7 +66,7 @@ function renderTable(container, columns, rows) {
     <table>
       <thead><tr>${columns.map(c => `<th>${c.label}</th>`).join("")}</tr></thead>
       <tbody>
-        ${rows.map(row => `<tr>${columns.map(c => `<td>${c.render ? c.render(row) : (row[c.key] ?? "-")}</td>`).join("")}</tr>`).join("")}
+        ${rows.map(row => `<tr>${columns.map(c => `<td data-label="${escapeHtml(c.label)}">${c.render ? c.render(row) : (row[c.key] ?? "-")}</td>`).join("")}</tr>`).join("")}
       </tbody>
     </table>
   `;

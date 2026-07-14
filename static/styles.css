@@ -210,8 +210,62 @@ code { background: #eceff3; padding: 2px 4px; border-radius: 4px; }
 }
 
 @media (max-width: 620px) {
-  main, .topbar { padding-left: 14px; padding-right: 14px; }
+  .topbar {
+    gap: 14px;
+    padding: 16px 14px 12px;
+  }
+  main { padding: 16px 14px 32px; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 19px; }
+  h3 { margin-bottom: 10px; }
+  .topbar p { font-size: 13px; }
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; justify-content: center; }
+  .toolbar { align-items: stretch; flex-direction: column; gap: 12px; }
+  .filters { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .filters > input, .filters > select { min-width: 0; }
+  .panel { padding: 12px; }
   .grid-form, fieldset { grid-template-columns: 1fr; }
-  .tabs { width: 100%; }
-  .tab { flex: 1 1 44%; justify-content: center; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .metric { padding: 12px; font-size: 12px; }
+  .metric strong { font-size: 20px; }
+  .recommendation-summary { flex-wrap: wrap; gap: 8px 14px; }
+  .bar-label { gap: 10px; font-size: 12px; }
+  .table-wrap { overflow-x: visible; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  table { font-size: 13px; }
+  thead { display: none; }
+  tbody { display: grid; gap: 10px; }
+  tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #fff;
+  }
+  tr:hover td { background: transparent; }
+  td {
+    display: grid;
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
+  }
+  td:last-child { border-bottom: 0; }
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  td input, td select, td textarea { min-width: 0; }
+  .inline-inventory { max-width: 96px; }
+  .target-notes { min-width: 0; }
+  #toast { left: 14px; right: 14px; bottom: 14px; text-align: center; }
 }
