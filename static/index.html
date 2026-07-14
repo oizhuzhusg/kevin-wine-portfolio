@@ -62,26 +62,9 @@
 
       <section id="purchases" class="view">
         <div class="toolbar"><h2>Purchases</h2></div>
-        <div class="two-col">
-          <form id="purchase-form" class="panel">
-            <h3>记录购买</h3>
-            <div class="grid-form">
-              <label>Wine<select name="wine_id" required></select></label>
-              <label>Date<input name="purchase_date" type="date" required /></label>
-              <label>Merchant<input name="merchant" /></label>
-              <label>Price / Bottle SGD<input name="price_sgd" type="number" min="0" step="0.01" required /></label>
-              <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label>
-              <label>Delivery Fee<input name="delivery_fee" type="number" min="0" step="0.01" value="0" /></label>
-              <label>Total Cost<input name="total_cost" type="number" min="0" step="0.01" placeholder="留空自动计算" /></label>
-              <label>Source<input name="source_file_or_link" placeholder="订单链接 / 文件名" /></label>
-            </div>
-            <label>Purchase Reason<textarea name="purchase_reason" rows="3"></textarea></label>
-            <button type="submit">保存购买并增加库存</button>
-          </form>
-          <div class="panel">
-            <h3>购买历史</h3>
-            <div id="purchase-table" class="table-wrap"></div>
-          </div>
+        <div class="panel">
+          <h3>购买历史</h3>
+          <div id="purchase-table" class="table-wrap"></div>
         </div>
       </section>
 

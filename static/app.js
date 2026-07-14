@@ -88,8 +88,6 @@ async function loadLookups() {
 async function loadWines() {
   state.wines = await api("/api/wines");
   renderInventory();
-  const purchaseSelect = $('#purchase-form select[name="wine_id"]');
-  purchaseSelect.innerHTML = state.wines.map(w => `<option value="${w.id}">${w.producer} - ${w.wine_name} ${w.vintage || ""}</option>`).join("");
 }
 
 async function renderDashboard() {
@@ -286,19 +284,6 @@ function wireEvents() {
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-status").addEventListener("change", renderPortfolioTargets);
 
-  $("#purchase-form").addEventListener("submit", async event => {
-    event.preventDefault();
-    await api("/api/purchases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formDataToJson(event.currentTarget))
-    });
-    event.currentTarget.reset();
-    $('#purchase-form input[name="quantity"]').value = 1;
-    $('#purchase-form input[name="delivery_fee"]').value = 0;
-    toast("购买已记录，库存已增加");
-    await refreshAll();
-  });
 }
 
 async function boot() {
