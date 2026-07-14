@@ -418,10 +418,25 @@ def dashboard(conn):
         current = (cat_counts.get(category, 0) / total_bottles) if total_bottles else 0
         if current + 0.03 < target:
             replenish.append({"category": category, "current": current, "target": target})
+    year = now_year()
     entering = [
-        w for w in wines
-        if w["current_inventory"] and w["drinking_window_start"] and now_year() <= int(w["drinking_window_start"]) <= now_year() + 2
+        {
+            **w,
+            "window_status": "现在适饮" if int(w["drinking_window_start"]) <= year else f"{w['drinking_window_start']} 起适饮",
+        }
+        for w in wines
+        if w["current_inventory"]
+        and w["drinking_window_start"]
+        and w["drinking_window_end"]
+        and int(w["drinking_window_end"]) >= year
+        and int(w["drinking_window_start"]) <= year + 2
     ]
+    entering.sort(
+        key=lambda w: (
+            0 if int(w["drinking_window_start"]) <= year else 1,
+            int(w["drinking_window_end"]) if int(w["drinking_window_start"]) <= year else int(w["drinking_window_start"]),
+        )
+    )
     return {
         "total_bottles": total_bottles,
         "color_counts": color_counts,
@@ -431,7 +446,7 @@ def dashboard(conn):
         "total_cost": total_cost,
         "average_bottle_cost": avg_cost,
         "replenish": replenish,
-        "entering_window": entering[:8],
+        "entering_window": entering,
         "targets": config
     }
 
