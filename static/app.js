@@ -139,10 +139,24 @@ function renderInventory() {
   const q = normalize($("#inventory-search").value);
   const color = $("#filter-color").value;
   const category = $("#filter-category").value;
+  const sort = $("#inventory-sort").value;
   const rows = state.wines.filter(w => {
     const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
     return (!q || text.includes(q)) && (!color || w.color === color) && (!category || w.category_tags.includes(category));
   });
+  if (sort !== "default") {
+    const direction = sort === "window-asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      const aHasWindow = Boolean(a.drinking_window_start);
+      const bHasWindow = Boolean(b.drinking_window_start);
+      if (aHasWindow !== bHasWindow) return aHasWindow ? -1 : 1;
+      const aStart = Number(a.drinking_window_start || 0);
+      const bStart = Number(b.drinking_window_start || 0);
+      const aEnd = Number(a.drinking_window_end || 0);
+      const bEnd = Number(b.drinking_window_end || 0);
+      return direction * (aStart - bStart || aEnd - bEnd || String(a.producer).localeCompare(String(b.producer)));
+    });
+  }
   renderTable($("#inventory-table"), [
     { label: "Producer", key: "producer" },
     { label: "Wine", render: r => `${r.wine_name}<br><span class="hint">${r.appellation || r.region || ""}</span>` },
@@ -280,6 +294,7 @@ function wireEvents() {
   $("#inventory-search").addEventListener("input", renderInventory);
   $("#filter-color").addEventListener("change", renderInventory);
   $("#filter-category").addEventListener("change", renderInventory);
+  $("#inventory-sort").addEventListener("change", renderInventory);
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
