@@ -169,8 +169,8 @@ function renderInventory() {
     { label: "Target", key: "target_inventory" },
     { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
-    { label: "Ideal", render: r => money(r.ideal_price_sgd) },
-    { label: "Max", render: r => money(r.max_price_sgd) }
+    { label: "参考理想价", render: r => money(r.ideal_price_sgd) },
+    { label: "最高可接受价", render: r => money(r.max_price_sgd) }
   ], rows);
   $$(".inline-inventory").forEach(input => {
     input.addEventListener("change", async () => {
