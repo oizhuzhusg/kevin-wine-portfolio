@@ -153,7 +153,8 @@ async function api(request, env, pathname) {
   if (pathname === "/api/portfolio-targets" && request.method === "POST") {
     const body = await requestBody(request);
     const fields = ["producer", "wine_name", "region", "country", "color", "recommended_vintages", "avoid_vintages", "ideal_price_sgd", "max_price_sgd", "role", "stage", "status", "personal_score", "would_buy_again", "notes"];
-    const values = fields.map(field => body[field] ?? null);
+    const inventoryDefaults = { current_inventory: 0, on_order_inventory: 0, target_inventory: 1 };
+    const values = fields.map(field => body[field] ?? inventoryDefaults[field] ?? null);
     const result = await env.DB.prepare(`INSERT INTO portfolio_targets (${fields.join(",")}) VALUES (${fields.map(() => "?").join(",")})`).bind(...values).run();
     return json(await env.DB.prepare("SELECT * FROM portfolio_targets WHERE id = ?").bind(result.meta.last_row_id).first(), 201);
   }
