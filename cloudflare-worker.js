@@ -31,7 +31,12 @@ const SCHEMA_STATEMENTS = [
     merchant TEXT, price_sgd REAL NOT NULL, quantity INTEGER NOT NULL, delivery_fee REAL NOT NULL DEFAULT 0,
     total_cost REAL NOT NULL, fulfillment_status TEXT NOT NULL DEFAULT 'delivered',
     estimated_delivery_date TEXT, delivered_date TEXT, purchase_reason TEXT, source_file_or_link TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP)`
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE TABLE IF NOT EXISTS bottles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, bottle_code TEXT UNIQUE,
+    wine_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'in_stock',
+    location_text TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`
 ];
 
 const SCHEMA_UPDATES = [
@@ -63,6 +68,56 @@ const parseTags = (value) => {
 
 function wineFromRow(row) {
   return { ...row, category_tags: parseTags(row.category_tags), style_tags: parseTags(row.style_tags) };
+}
+
+function wineLocationText(wine, position) {
+  if (!wine.storage_unit || !wine.storage_shelf) return null;
+  const row = { front: "前排", back: "后排" }[wine.storage_row] || wine.storage_row;
+  const stack = { top: "上层", upper: "上层", bottom: "下层", lower: "下层" }[wine.storage_stack] || wine.storage_stack;
+  const parts = [wine.storage_unit, `第${wine.storage_shelf}层`];
+  if (stack) parts.push(stack);
+  if (row) parts.push(row);
+  if (position) parts.push(`位置${position}`);
+  return parts.join(" · ");
+}
+
+function positionsForWine(wine, count) {
+  const positions = String(wine.storage_positions || "").split("、").map(value => value.trim()).filter(Boolean);
+  if (positions.length) return Array.from({ length: count }, (_, index) => positions[index] || null);
+  if (wine.storage_slot && count === 1) return [wine.storage_slot];
+  return Array.from({ length: count }, () => null);
+}
+
+async function ensureBottleRecords(env) {
+  const wines = (await env.DB.prepare("SELECT * FROM wines WHERE current_inventory > 0 OR on_order_inventory > 0").all()).results;
+  const existing = (await env.DB.prepare("SELECT wine_id, status, COUNT(*) AS count FROM bottles GROUP BY wine_id, status").all()).results;
+  const counts = new Map(existing.map(row => [`${row.wine_id}:${row.status}`, Number(row.count)]));
+  for (const wine of wines) {
+    for (const [status, target] of [["in_stock", Number(wine.current_inventory || 0)], ["on_order", Number(wine.on_order_inventory || 0)]]) {
+      const current = counts.get(`${wine.id}:${status}`) || 0;
+      const needed = Math.max(0, target - current);
+      const positions = status === "in_stock" ? positionsForWine(wine, target) : [];
+      for (let index = 0; index < needed; index += 1) {
+        const position = positions[current + index];
+        const result = await env.DB.prepare("INSERT INTO bottles (wine_id, status, location_text) VALUES (?, ?, ?)")
+          .bind(wine.id, status, status === "in_stock" ? wineLocationText(wine, position) : "运输中").run();
+        const bottleCode = `B-${String(result.meta.last_row_id).padStart(4, "0")}`;
+        await env.DB.prepare("UPDATE bottles SET bottle_code = ? WHERE id = ?").bind(bottleCode, result.meta.last_row_id).run();
+      }
+    }
+  }
+}
+
+async function winesWithBottles(env) {
+  const wines = (await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow);
+  const bottles = (await env.DB.prepare("SELECT wine_id, bottle_code, status, location_text FROM bottles ORDER BY id").all()).results;
+  const bottleMap = new Map();
+  for (const bottle of bottles) {
+    const list = bottleMap.get(bottle.wine_id) || [];
+    list.push(bottle);
+    bottleMap.set(bottle.wine_id, list);
+  }
+  return wines.map(wine => ({ ...wine, bottles: bottleMap.get(wine.id) || [] }));
 }
 
 async function ensureSchema(env) {
@@ -155,6 +210,18 @@ async function dashboard(env) {
 async function api(request, env, pathname) {
   if (pathname === "/api/lookups" && request.method === "GET") return json({ categories: CATEGORIES, colors: COLORS, watchlist: [] });
   if (pathname === "/api/dashboard" && request.method === "GET") return json(await dashboard(env));
+  if (pathname === "/api/bottles" && request.method === "GET") {
+    return json((await env.DB.prepare("SELECT bottles.*, wines.producer, wines.wine_name, wines.vintage FROM bottles JOIN wines ON wines.id = bottles.wine_id ORDER BY bottles.id").all()).results);
+  }
+  const bottleMatch = pathname.match(/^\/api\/bottles\/(B-\d+)$/);
+  if (bottleMatch && request.method === "PATCH") {
+    const body = await requestBody(request);
+    const entries = Object.entries(body).filter(([key]) => ["status", "location_text"].includes(key));
+    if (!entries.length) return json({ error: "No editable fields supplied" }, 400);
+    await env.DB.prepare(`UPDATE bottles SET ${entries.map(([key]) => `${key} = ?`).join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE bottle_code = ?`)
+      .bind(...entries.map(([, value]) => value), bottleMatch[1]).run();
+    return json(await env.DB.prepare("SELECT * FROM bottles WHERE bottle_code = ?").bind(bottleMatch[1]).first());
+  }
   if (pathname === "/api/portfolio-targets" && request.method === "GET") {
     await ensureTargets(env);
     return json((await env.DB.prepare("SELECT * FROM portfolio_targets ORDER BY region, color, producer, wine_name").all()).results);
@@ -177,7 +244,7 @@ async function api(request, env, pathname) {
     await env.DB.prepare(`UPDATE portfolio_targets SET ${assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(...entries.map(([, value]) => value), Number(targetMatch[1])).run();
     return json(await env.DB.prepare("SELECT * FROM portfolio_targets WHERE id = ?").bind(Number(targetMatch[1])).first());
   }
-  if (pathname === "/api/wines" && request.method === "GET") return json((await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow));
+  if (pathname === "/api/wines" && request.method === "GET") return json(await winesWithBottles(env));
   if (pathname === "/api/wines" && request.method === "POST") {
     const body = await requestBody(request);
     const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "storage_positions", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
@@ -246,6 +313,7 @@ export default {
       if (url.pathname.startsWith("/api/")) {
         if (!env.DB) return json({ error: "D1 database binding DB is not configured" }, 503);
         await ensureSchema(env);
+        await ensureBottleRecords(env);
         return await api(request, env, url.pathname);
       }
       return env.ASSETS.fetch(request);

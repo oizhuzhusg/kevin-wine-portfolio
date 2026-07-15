@@ -185,6 +185,21 @@ tr:hover td { background: #fafafa; }
   white-space: nowrap;
   color: var(--muted);
 }
+
+.bottle-code {
+  display: inline-block;
+  margin: 1px;
+  padding: 2px 5px;
+  border: 1px solid #b6c3cc;
+  border-radius: 3px;
+  background: #f4f7f8;
+  color: #29485f;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
 .stock-status {
   display: inline-flex;
   align-items: center;

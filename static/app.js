@@ -171,6 +171,7 @@ function renderInventory() {
     { label: "Use", render: r => r.category_tags.map(t => `<span class="tag">${t}</span>`).join("") },
     { label: "Profile", render: r => `<span class="hint">${escapeHtml(r.portfolio_role_reason || "")}<br>${escapeHtml(r.wine_introduction || "")}</span>` },
     { label: "Rating", render: r => starRating(r.id, r.personal_score) },
+    { label: "瓶号", render: r => bottleCodes(r) },
     { label: "Status", render: r => inventoryStatus(r) },
     { label: "Location", render: r => storageLocation(r) },
     { label: "Target", key: "target_inventory" },
@@ -218,6 +219,7 @@ function renderMobileInventory(rows) {
           <div class="mobile-detail-row"><span>最佳适饮期</span><strong>${window}</strong></div>
           <div class="mobile-detail-row"><span>状态 / 目标</span><span>${inventoryStatus(wine)} / ${wine.target_inventory || 0}</span></div>
           <div class="mobile-detail-row"><span>酒柜位置</span><strong>${storageLocation(wine)}</strong></div>
+          <div class="mobile-detail-row"><span>独立编号</span><strong>${bottleCodes(wine)}</strong></div>
           <div class="mobile-detail-row"><span>评分</span>${starRating(wine.id, wine.personal_score)}</div>
           <div class="mobile-detail-block"><span>酒款定位</span><p>${escapeHtml(wine.portfolio_role_reason || "-")}</p></div>
           <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
@@ -248,6 +250,12 @@ function inventoryStatus(wine) {
   if (delivered) parts.push(`<span class="stock-status stock-delivered">已到货 ${delivered}</span>`);
   if (ordered) parts.push(`<span class="stock-status stock-ordered">运输中 ${ordered}</span>`);
   return parts.join(" ") || '<span class="hint">无库存</span>';
+}
+
+function bottleCodes(wine) {
+  const bottles = wine.bottles || [];
+  if (!bottles.length) return '<span class="hint">生成中</span>';
+  return bottles.map(bottle => `<span class="bottle-code" title="${escapeHtml(bottle.location_text || bottle.status)}">${escapeHtml(bottle.bottle_code)}</span>`).join(" ");
 }
 
 function storageLocation(wine) {
