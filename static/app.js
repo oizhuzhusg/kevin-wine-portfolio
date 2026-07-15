@@ -98,8 +98,8 @@ async function renderDashboard() {
     <div class="metric-grid">
       <div class="metric">在库酒款<strong>${data.total_bottles}</strong></div>
       <div class="metric">运输中<strong>${data.ordered_bottles}</strong></div>
-      <div class="metric">总成本 / 估值<strong>${money(data.total_cost)}</strong><span class="hint">实付 ${money(data.purchase_cost)} + 估值 ${money(data.reference_valuation_cost)}</span></div>
-      <div class="metric">平均单瓶成本<strong>${money(data.average_bottle_cost)}</strong><span class="hint">含无成交价酒款的参考市价</span></div>
+      <div class="metric">库存估值<strong>${money(data.total_market_value)}</strong><span class="hint">按参考市场价计算</span></div>
+      <div class="metric">平均单瓶估值<strong>${money(data.average_market_value)}</strong><span class="hint">已估值 ${data.valued_bottles} 瓶${data.unvalued_bottles ? `；${data.unvalued_bottles} 瓶待补市价` : ""}</span></div>
       <div class="metric">补货类别<strong>${data.replenish.map(r => r.category).join(", ") || "结构健康"}</strong></div>
     </div>
     <div class="bars">
