@@ -104,6 +104,13 @@ async function requestBody(request) {
 async function dashboard(env) {
   const wines = (await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow);
   const purchases = await env.DB.prepare("SELECT COALESCE(SUM(total_cost), 0) AS total, COALESCE(SUM(quantity), 0) AS qty FROM purchases").first();
+  const referenceValuation = await env.DB.prepare(`SELECT
+      COALESCE(SUM(w.current_market_price_sgd * w.current_inventory), 0) AS total,
+      COALESCE(SUM(w.current_inventory), 0) AS qty
+    FROM wines w
+    WHERE w.current_inventory > 0
+      AND w.current_market_price_sgd IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM purchases p WHERE p.wine_id = w.id)`).first();
   const totalBottles = wines.reduce((sum, wine) => sum + Number(wine.current_inventory || 0), 0);
   const orderedBottles = wines.reduce((sum, wine) => sum + Number(wine.on_order_inventory || 0), 0);
   const colorCounts = Object.fromEntries(COLORS.map(color => [color, 0]));
@@ -118,8 +125,12 @@ async function dashboard(env) {
   return {
     total_bottles: totalBottles,
     ordered_bottles: orderedBottles,
-    total_cost: Number(purchases.total || 0),
-    average_bottle_cost: purchases.qty ? Number(purchases.total) / Number(purchases.qty) : 0,
+    purchase_cost: Number(purchases.total || 0),
+    reference_valuation_cost: Number(referenceValuation.total || 0),
+    total_cost: Number(purchases.total || 0) + Number(referenceValuation.total || 0),
+    average_bottle_cost: (Number(purchases.qty || 0) + Number(referenceValuation.qty || 0))
+      ? (Number(purchases.total || 0) + Number(referenceValuation.total || 0)) / (Number(purchases.qty || 0) + Number(referenceValuation.qty || 0))
+      : 0,
     color_counts: colorCounts,
     color_percentages: Object.fromEntries(COLORS.map(color => [color, totalBottles ? colorCounts[color] / totalBottles : 0])),
     category_counts: categoryCounts,
