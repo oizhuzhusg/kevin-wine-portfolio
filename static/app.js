@@ -255,10 +255,10 @@ function storageLocation(wine) {
     return Number(wine.on_order_inventory || 0) ? '<span class="hint">到货后记录</span>' : '<span class="hint">待记录</span>';
   }
   const row = { front: "前排", back: "后排" }[wine.storage_row] || wine.storage_row;
-  const stack = { top: "上层", bottom: "下层" }[wine.storage_stack] || wine.storage_stack;
+  const stack = { top: "上层", upper: "上层", bottom: "下层", lower: "下层" }[wine.storage_stack] || wine.storage_stack;
   const parts = [escapeHtml(wine.storage_unit), `第 ${wine.storage_shelf} 层`];
-  if (row) parts.push(escapeHtml(row));
   if (stack) parts.push(escapeHtml(stack));
+  if (row) parts.push(escapeHtml(row));
   if (wine.storage_positions) parts.push(`位置 ${escapeHtml(wine.storage_positions)}`);
   else if (wine.storage_slot) parts.push(`位置 ${wine.storage_slot}`);
   return `<span class="storage-location">${parts.join(" · ")}</span>`;
