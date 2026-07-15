@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS wines (
   storage_row TEXT,
   storage_stack TEXT,
   storage_slot INTEGER,
+  storage_positions TEXT,
   tasted_before INTEGER DEFAULT 0,
   personal_score REAL,
   portfolio_role_reason TEXT,

@@ -259,7 +259,8 @@ function storageLocation(wine) {
   const parts = [escapeHtml(wine.storage_unit), `第 ${wine.storage_shelf} 层`];
   if (row) parts.push(escapeHtml(row));
   if (stack) parts.push(escapeHtml(stack));
-  if (wine.storage_slot) parts.push(`位置 ${wine.storage_slot}`);
+  if (wine.storage_positions) parts.push(`位置 ${escapeHtml(wine.storage_positions)}`);
+  else if (wine.storage_slot) parts.push(`位置 ${wine.storage_slot}`);
   return `<span class="storage-location">${parts.join(" · ")}</span>`;
 }
 

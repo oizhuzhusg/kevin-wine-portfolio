@@ -21,7 +21,7 @@ const SCHEMA_STATEMENTS = [
     drinking_window_end INTEGER, ideal_price_sgd REAL, max_price_sgd REAL, current_market_price_sgd REAL,
     current_inventory INTEGER NOT NULL DEFAULT 0, on_order_inventory INTEGER NOT NULL DEFAULT 0,
     target_inventory INTEGER NOT NULL DEFAULT 1,
-    storage_unit TEXT, storage_shelf INTEGER, storage_row TEXT, storage_stack TEXT, storage_slot INTEGER,
+    storage_unit TEXT, storage_shelf INTEGER, storage_row TEXT, storage_stack TEXT, storage_slot INTEGER, storage_positions TEXT,
     personal_score REAL, portfolio_role_reason TEXT, wine_introduction TEXT,
     current_drinking_advice TEXT, decanting_advice TEXT,
     category_tags TEXT NOT NULL DEFAULT '[]', style_tags TEXT NOT NULL DEFAULT '[]',
@@ -48,7 +48,8 @@ const SCHEMA_UPDATES = [
   "ALTER TABLE wines ADD COLUMN storage_row TEXT",
   "ALTER TABLE wines ADD COLUMN storage_stack TEXT",
   "ALTER TABLE wines ADD COLUMN storage_slot INTEGER",
-  "ALTER TABLE wines ADD COLUMN current_market_price_sgd REAL"
+  "ALTER TABLE wines ADD COLUMN current_market_price_sgd REAL",
+  "ALTER TABLE wines ADD COLUMN storage_positions TEXT"
 ];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
@@ -169,7 +170,7 @@ async function api(request, env, pathname) {
   if (pathname === "/api/wines" && request.method === "GET") return json((await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow));
   if (pathname === "/api/wines" && request.method === "POST") {
     const body = await requestBody(request);
-    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
+    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "storage_positions", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const values = fields.map(field => body[field] ?? null);
     values[0] ||= "Unknown"; values[1] ||= "Unnamed wine"; values[8] ||= "red";
     const result = await env.DB.prepare(`INSERT INTO wines (${fields.join(",")}, category_tags, style_tags) VALUES (${fields.map(() => "?").join(",")}, ?, ?)`)
@@ -179,7 +180,7 @@ async function api(request, env, pathname) {
   const wineMatch = pathname.match(/^\/api\/wines\/(\d+)$/);
   if (wineMatch && request.method === "PATCH") {
     const body = await requestBody(request);
-    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
+    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "storage_positions", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const entries = Object.entries(body).filter(([key]) => allowed.includes(key));
     if (body.category_tags) entries.push(["category_tags", JSON.stringify(body.category_tags)]);
     if (body.style_tags) entries.push(["style_tags", JSON.stringify(body.style_tags)]);
