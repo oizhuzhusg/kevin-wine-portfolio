@@ -176,6 +176,7 @@ function renderInventory() {
     { label: "Target", key: "target_inventory" },
     { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
+    { label: "参考市价", render: r => money(r.current_market_price_sgd) },
     { label: "参考理想价", render: r => money(r.ideal_price_sgd) },
     { label: "最高可接受价", render: r => money(r.max_price_sgd) }
   ], rows);
@@ -222,6 +223,7 @@ function renderMobileInventory(rows) {
           <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
           <div class="mobile-detail-block"><span>现在怎么喝</span><p>${escapeHtml(wine.current_drinking_advice || "-")}</p></div>
           <div class="mobile-detail-block"><span>醒酒建议</span><p>${escapeHtml(wine.decanting_advice || "-")}</p></div>
+          <div class="mobile-detail-row"><span>参考市价</span><strong>${money(wine.current_market_price_sgd)}</strong></div>
           <div class="mobile-detail-row"><span>参考理想价</span><strong>${money(wine.ideal_price_sgd)}</strong></div>
           <div class="mobile-detail-row"><span>最高可接受价</span><strong>${money(wine.max_price_sgd)}</strong></div>
         </div>
