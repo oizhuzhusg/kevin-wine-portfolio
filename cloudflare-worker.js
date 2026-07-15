@@ -2,6 +2,7 @@ import seedTargets from "./seed-targets.json";
 
 const CATEGORIES = ["Drink Now", "Cellar", "Business", "Discovery"];
 const COLORS = ["red", "white", "sparkling", "sweet", "fortified"];
+const FULFILLMENT_STATUSES = ["ordered", "delivered"];
 let seedPromise;
 let schemaPromise;
 
@@ -18,7 +19,8 @@ const SCHEMA_STATEMENTS = [
     region TEXT, country TEXT, appellation TEXT, vineyard_or_climat TEXT, classification TEXT,
     grape_variety TEXT, color TEXT NOT NULL DEFAULT 'red', vintage INTEGER, drinking_window_start INTEGER,
     drinking_window_end INTEGER, ideal_price_sgd REAL, max_price_sgd REAL,
-    current_inventory INTEGER NOT NULL DEFAULT 0, target_inventory INTEGER NOT NULL DEFAULT 1,
+    current_inventory INTEGER NOT NULL DEFAULT 0, on_order_inventory INTEGER NOT NULL DEFAULT 0,
+    target_inventory INTEGER NOT NULL DEFAULT 1,
     personal_score REAL, portfolio_role_reason TEXT, wine_introduction TEXT,
     current_drinking_advice TEXT, decanting_advice TEXT,
     category_tags TEXT NOT NULL DEFAULT '[]', style_tags TEXT NOT NULL DEFAULT '[]',
@@ -26,15 +28,20 @@ const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT, wine_id INTEGER NOT NULL, purchase_date TEXT NOT NULL,
     merchant TEXT, price_sgd REAL NOT NULL, quantity INTEGER NOT NULL, delivery_fee REAL NOT NULL DEFAULT 0,
-    total_cost REAL NOT NULL, purchase_reason TEXT, source_file_or_link TEXT,
+    total_cost REAL NOT NULL, fulfillment_status TEXT NOT NULL DEFAULT 'delivered',
+    estimated_delivery_date TEXT, delivered_date TEXT, purchase_reason TEXT, source_file_or_link TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP)`
 ];
 
-const WINE_COLUMN_UPDATES = [
+const SCHEMA_UPDATES = [
   "ALTER TABLE wines ADD COLUMN portfolio_role_reason TEXT",
   "ALTER TABLE wines ADD COLUMN wine_introduction TEXT",
   "ALTER TABLE wines ADD COLUMN current_drinking_advice TEXT",
-  "ALTER TABLE wines ADD COLUMN decanting_advice TEXT"
+  "ALTER TABLE wines ADD COLUMN decanting_advice TEXT",
+  "ALTER TABLE wines ADD COLUMN on_order_inventory INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE purchases ADD COLUMN fulfillment_status TEXT NOT NULL DEFAULT 'delivered'",
+  "ALTER TABLE purchases ADD COLUMN estimated_delivery_date TEXT",
+  "ALTER TABLE purchases ADD COLUMN delivered_date TEXT"
 ];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
@@ -54,7 +61,7 @@ async function ensureSchema(env) {
   if (!schemaPromise) {
     schemaPromise = (async () => {
       await env.DB.batch(SCHEMA_STATEMENTS.map(sql => env.DB.prepare(sql)));
-      for (const sql of WINE_COLUMN_UPDATES) {
+      for (const sql of SCHEMA_UPDATES) {
         try { await env.DB.prepare(sql).run(); }
         catch (error) { if (!String(error.message).includes("duplicate column name")) throw error; }
       }
@@ -90,6 +97,7 @@ async function dashboard(env) {
   const wines = (await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow);
   const purchases = await env.DB.prepare("SELECT COALESCE(SUM(total_cost), 0) AS total, COALESCE(SUM(quantity), 0) AS qty FROM purchases").first();
   const totalBottles = wines.reduce((sum, wine) => sum + Number(wine.current_inventory || 0), 0);
+  const orderedBottles = wines.reduce((sum, wine) => sum + Number(wine.on_order_inventory || 0), 0);
   const colorCounts = Object.fromEntries(COLORS.map(color => [color, 0]));
   const categoryCounts = Object.fromEntries(CATEGORIES.map(category => [category, 0]));
   for (const wine of wines) {
@@ -101,6 +109,7 @@ async function dashboard(env) {
   const year = new Date().getFullYear();
   return {
     total_bottles: totalBottles,
+    ordered_bottles: orderedBottles,
     total_cost: Number(purchases.total || 0),
     average_bottle_cost: purchases.qty ? Number(purchases.total) / Number(purchases.qty) : 0,
     color_counts: colorCounts,
@@ -153,7 +162,7 @@ async function api(request, env, pathname) {
   if (pathname === "/api/wines" && request.method === "GET") return json((await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow));
   if (pathname === "/api/wines" && request.method === "POST") {
     const body = await requestBody(request);
-    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
+    const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const values = fields.map(field => body[field] ?? null);
     values[0] ||= "Unknown"; values[1] ||= "Unnamed wine"; values[8] ||= "red";
     const result = await env.DB.prepare(`INSERT INTO wines (${fields.join(",")}, category_tags, style_tags) VALUES (${fields.map(() => "?").join(",")}, ?, ?)`)
@@ -163,7 +172,7 @@ async function api(request, env, pathname) {
   const wineMatch = pathname.match(/^\/api\/wines\/(\d+)$/);
   if (wineMatch && request.method === "PATCH") {
     const body = await requestBody(request);
-    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
+    const allowed = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
     const entries = Object.entries(body).filter(([key]) => allowed.includes(key));
     if (body.category_tags) entries.push(["category_tags", JSON.stringify(body.category_tags)]);
     if (body.style_tags) entries.push(["style_tags", JSON.stringify(body.style_tags)]);
@@ -178,12 +187,36 @@ async function api(request, env, pathname) {
     const body = await requestBody(request);
     const quantity = Number(body.quantity || 1);
     const total = Number(body.total_cost || (Number(body.price_sgd || 0) * quantity + Number(body.delivery_fee || 0)));
+    const fulfillmentStatus = FULFILLMENT_STATUSES.includes(body.fulfillment_status) ? body.fulfillment_status : "ordered";
+    const inventoryColumn = fulfillmentStatus === "delivered" ? "current_inventory" : "on_order_inventory";
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO purchases (wine_id, purchase_date, merchant, price_sgd, quantity, delivery_fee, total_cost, purchase_reason, source_file_or_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(body.wine_id, body.purchase_date, body.merchant || null, body.price_sgd, quantity, body.delivery_fee || 0, total, body.purchase_reason || null, body.source_file_or_link || null),
-      env.DB.prepare("UPDATE wines SET current_inventory = current_inventory + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(quantity, body.wine_id)
+      env.DB.prepare("INSERT INTO purchases (wine_id, purchase_date, merchant, price_sgd, quantity, delivery_fee, total_cost, fulfillment_status, estimated_delivery_date, delivered_date, purchase_reason, source_file_or_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(body.wine_id, body.purchase_date, body.merchant || null, body.price_sgd, quantity, body.delivery_fee || 0, total, fulfillmentStatus, body.estimated_delivery_date || null, body.delivered_date || null, body.purchase_reason || null, body.source_file_or_link || null),
+      env.DB.prepare(`UPDATE wines SET ${inventoryColumn} = ${inventoryColumn} + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(quantity, body.wine_id)
     ]);
     return json({ ok: true }, 201);
+  }
+  const purchaseMatch = pathname.match(/^\/api\/purchases\/(\d+)$/);
+  if (purchaseMatch && request.method === "PATCH") {
+    const existing = await env.DB.prepare("SELECT * FROM purchases WHERE id = ?").bind(Number(purchaseMatch[1])).first();
+    if (!existing) return json({ error: "Purchase not found" }, 404);
+    const body = await requestBody(request);
+    const nextStatus = body.fulfillment_status && FULFILLMENT_STATUSES.includes(body.fulfillment_status)
+      ? body.fulfillment_status
+      : existing.fulfillment_status;
+    const entries = Object.entries(body).filter(([key]) => ["merchant", "estimated_delivery_date", "delivered_date", "purchase_reason", "source_file_or_link"].includes(key));
+    if (nextStatus !== existing.fulfillment_status) entries.push(["fulfillment_status", nextStatus]);
+    if (!entries.length) return json({ error: "No editable fields supplied" }, 400);
+    const statements = [
+      env.DB.prepare(`UPDATE purchases SET ${entries.map(([key]) => `${key} = ?`).join(", ")} WHERE id = ?`).bind(...entries.map(([, value]) => value), existing.id)
+    ];
+    if (nextStatus !== existing.fulfillment_status) {
+      const fromColumn = existing.fulfillment_status === "delivered" ? "current_inventory" : "on_order_inventory";
+      const toColumn = nextStatus === "delivered" ? "current_inventory" : "on_order_inventory";
+      statements.push(env.DB.prepare(`UPDATE wines SET ${fromColumn} = MAX(0, ${fromColumn} - ?), ${toColumn} = ${toColumn} + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(existing.quantity, existing.quantity, existing.wine_id));
+    }
+    await env.DB.batch(statements);
+    return json(await env.DB.prepare("SELECT purchases.*, wines.producer, wines.wine_name, wines.vintage FROM purchases JOIN wines ON wines.id = purchases.wine_id WHERE purchases.id = ?").bind(existing.id).first());
   }
   return json({ error: "Not found" }, 404);
 }

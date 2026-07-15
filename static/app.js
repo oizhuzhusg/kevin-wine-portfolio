@@ -96,7 +96,8 @@ async function renderDashboard() {
   const catTargets = data.targets.category_targets;
   $("#dashboard-content").innerHTML = `
     <div class="metric-grid">
-      <div class="metric">总库存<strong>${data.total_bottles}</strong></div>
+      <div class="metric">在库酒款<strong>${data.total_bottles}</strong></div>
+      <div class="metric">运输中<strong>${data.ordered_bottles}</strong></div>
       <div class="metric">库存总成本<strong>${money(data.total_cost)}</strong></div>
       <div class="metric">平均单瓶成本<strong>${money(data.average_bottle_cost)}</strong></div>
       <div class="metric">补货类别<strong>${data.replenish.map(r => r.category).join(", ") || "结构健康"}</strong></div>
@@ -122,7 +123,7 @@ async function renderDashboard() {
     { label: "Vintage", key: "vintage" },
     { label: "Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Status", key: "window_status" },
-    { label: "Inventory", key: "current_inventory" }
+    { label: "Stock", render: r => inventoryStatus(r) }
   ], data.entering_window);
 }
 
@@ -165,7 +166,7 @@ function renderInventory() {
     { label: "Use", render: r => r.category_tags.map(t => `<span class="tag">${t}</span>`).join("") },
     { label: "Profile", render: r => `<span class="hint">${escapeHtml(r.portfolio_role_reason || "")}<br>${escapeHtml(r.wine_introduction || "")}</span>` },
     { label: "Rating", render: r => starRating(r.id, r.personal_score) },
-    { label: "Inventory", render: r => `<input class="inline-inventory" data-id="${r.id}" type="number" min="0" value="${r.current_inventory || 0}" />` },
+    { label: "Status", render: r => inventoryStatus(r) },
     { label: "Target", key: "target_inventory" },
     { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
@@ -173,17 +174,6 @@ function renderInventory() {
     { label: "最高可接受价", render: r => money(r.max_price_sgd) }
   ], rows);
   renderMobileInventory(rows);
-  $$(".inline-inventory").forEach(input => {
-    input.addEventListener("change", async () => {
-      await api(`/api/wines/${input.dataset.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ current_inventory: Number.parseInt(input.value, 10) || 0 })
-      });
-      toast("库存已更新");
-      await refreshAll();
-    });
-  });
   $$(".star").forEach(button => {
     button.addEventListener("click", async () => {
       await api(`/api/wines/${button.dataset.id}`, {
@@ -219,7 +209,7 @@ function renderMobileInventory(rows) {
         </summary>
         <div class="mobile-wine-details">
           <div class="mobile-detail-row"><span>最佳适饮期</span><strong>${window}</strong></div>
-          <div class="mobile-detail-row"><span>库存 / 目标</span><span><input class="inline-inventory" data-id="${wine.id}" type="number" min="0" value="${wine.current_inventory || 0}" /> / ${wine.target_inventory || 0}</span></div>
+          <div class="mobile-detail-row"><span>状态 / 目标</span><span>${inventoryStatus(wine)} / ${wine.target_inventory || 0}</span></div>
           <div class="mobile-detail-row"><span>评分</span>${starRating(wine.id, wine.personal_score)}</div>
           <div class="mobile-detail-block"><span>酒款定位</span><p>${escapeHtml(wine.portfolio_role_reason || "-")}</p></div>
           <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
@@ -242,6 +232,15 @@ function starRating(wineId, score) {
   `;
 }
 
+function inventoryStatus(wine) {
+  const delivered = Number(wine.current_inventory || 0);
+  const ordered = Number(wine.on_order_inventory || 0);
+  const parts = [];
+  if (delivered) parts.push(`<span class="stock-status stock-delivered">已到货 ${delivered}</span>`);
+  if (ordered) parts.push(`<span class="stock-status stock-ordered">运输中 ${ordered}</span>`);
+  return parts.join(" ") || '<span class="hint">无库存</span>';
+}
+
 async function renderPurchases() {
   state.purchases = await api("/api/purchases");
   renderPurchaseTable();
@@ -259,9 +258,18 @@ function renderPurchaseTable() {
     { label: "Merchant", key: "merchant" },
     { label: "Price", render: r => money(r.price_sgd) },
     { label: "Qty", key: "quantity" },
+    { label: "Status", render: r => purchaseStatus(r) },
     { label: "Total", render: r => money(r.total_cost) },
     { label: "Reason", key: "purchase_reason" }
   ], rows);
+}
+
+function purchaseStatus(purchase) {
+  if (purchase.fulfillment_status === "delivered") {
+    return '<span class="stock-status stock-delivered">已到货</span>';
+  }
+  const eta = purchase.estimated_delivery_date ? `预计 ${purchase.estimated_delivery_date}` : "待确认送达";
+  return `<span class="stock-status stock-ordered">已下单</span><br><span class="hint">${eta}</span>`;
 }
 
 async function loadPortfolioTargets() {
