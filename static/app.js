@@ -138,12 +138,17 @@ function bar(label, current, target, count) {
 
 function renderInventory() {
   const q = normalize($("#inventory-search").value);
+  const cabinet = $("#filter-cabinet").value;
   const color = $("#filter-color").value;
   const category = $("#filter-category").value;
   const sort = $("#inventory-sort").value;
   const rows = state.wines.filter(w => {
     const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
-    return (!q || text.includes(q)) && (!color || w.color === color) && (!category || w.category_tags.includes(category));
+    const hasLocation = Boolean(w.storage_unit && w.storage_shelf);
+    return (!q || text.includes(q))
+      && (!cabinet || (cabinet === "unassigned" ? !hasLocation : w.storage_unit === cabinet))
+      && (!color || w.color === color)
+      && (!category || w.category_tags.includes(category));
   });
   if (sort !== "default") {
     const direction = sort === "window-asc" ? 1 : -1;
@@ -167,6 +172,7 @@ function renderInventory() {
     { label: "Profile", render: r => `<span class="hint">${escapeHtml(r.portfolio_role_reason || "")}<br>${escapeHtml(r.wine_introduction || "")}</span>` },
     { label: "Rating", render: r => starRating(r.id, r.personal_score) },
     { label: "Status", render: r => inventoryStatus(r) },
+    { label: "Location", render: r => storageLocation(r) },
     { label: "Target", key: "target_inventory" },
     { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
@@ -210,6 +216,7 @@ function renderMobileInventory(rows) {
         <div class="mobile-wine-details">
           <div class="mobile-detail-row"><span>最佳适饮期</span><strong>${window}</strong></div>
           <div class="mobile-detail-row"><span>状态 / 目标</span><span>${inventoryStatus(wine)} / ${wine.target_inventory || 0}</span></div>
+          <div class="mobile-detail-row"><span>酒柜位置</span><strong>${storageLocation(wine)}</strong></div>
           <div class="mobile-detail-row"><span>评分</span>${starRating(wine.id, wine.personal_score)}</div>
           <div class="mobile-detail-block"><span>酒款定位</span><p>${escapeHtml(wine.portfolio_role_reason || "-")}</p></div>
           <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
@@ -239,6 +246,19 @@ function inventoryStatus(wine) {
   if (delivered) parts.push(`<span class="stock-status stock-delivered">已到货 ${delivered}</span>`);
   if (ordered) parts.push(`<span class="stock-status stock-ordered">运输中 ${ordered}</span>`);
   return parts.join(" ") || '<span class="hint">无库存</span>';
+}
+
+function storageLocation(wine) {
+  if (!wine.storage_unit || !wine.storage_shelf) {
+    return Number(wine.on_order_inventory || 0) ? '<span class="hint">到货后记录</span>' : '<span class="hint">待记录</span>';
+  }
+  const row = { front: "前排", back: "后排" }[wine.storage_row] || wine.storage_row;
+  const stack = { top: "上层", bottom: "下层" }[wine.storage_stack] || wine.storage_stack;
+  const parts = [escapeHtml(wine.storage_unit), `第 ${wine.storage_shelf} 层`];
+  if (row) parts.push(escapeHtml(row));
+  if (stack) parts.push(escapeHtml(stack));
+  if (wine.storage_slot) parts.push(`位置 ${wine.storage_slot}`);
+  return `<span class="storage-location">${parts.join(" · ")}</span>`;
 }
 
 async function renderPurchases() {
@@ -346,6 +366,7 @@ function wireEvents() {
   }));
   $('[data-action="refresh"]').addEventListener("click", refreshAll);
   $("#inventory-search").addEventListener("input", renderInventory);
+  $("#filter-cabinet").addEventListener("change", renderInventory);
   $("#filter-color").addEventListener("change", renderInventory);
   $("#filter-category").addEventListener("change", renderInventory);
   $("#inventory-sort").addEventListener("change", renderInventory);
