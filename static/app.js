@@ -113,7 +113,7 @@ async function renderDashboard() {
       </div>
     </div>
     <div class="panel" style="margin-top:16px">
-      <h3>近期饮用与即将进入适饮期</h3>
+      <h3>优先开瓶</h3>
       <div class="table-wrap" id="window-table"></div>
     </div>
   `;
@@ -124,7 +124,7 @@ async function renderDashboard() {
     { label: "Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
     { label: "Status", key: "window_status" },
     { label: "Stock", render: r => inventoryStatus(r) }
-  ], data.entering_window);
+  ], data.priority_to_open);
 }
 
 function bar(label, current, target, count) {

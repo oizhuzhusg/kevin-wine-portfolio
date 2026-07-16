@@ -189,20 +189,15 @@ async function dashboard(env) {
     category_counts: categoryCounts,
     category_percentages: Object.fromEntries(CATEGORIES.map(category => [category, totalBottles ? categoryCounts[category] / totalBottles : 0])),
     replenish: Object.entries(categoryTargets).filter(([category, target]) => totalBottles && (categoryCounts[category] / totalBottles) + 0.03 < target).map(([category, target]) => ({ category, target })),
-    entering_window: wines
-      .filter(wine => wine.current_inventory && wine.drinking_window_start && wine.drinking_window_end && wine.drinking_window_end >= year && wine.drinking_window_start <= year + 2)
+    priority_to_open: wines
+      .filter(wine => wine.current_inventory && wine.drinking_window_end && wine.drinking_window_end <= year + 3)
       .map(wine => ({
         ...wine,
-        window_status: wine.drinking_window_start <= year ? "现在适饮" : `${wine.drinking_window_start} 起适饮`
+        window_status: wine.drinking_window_end <= year
+          ? "今年优先"
+          : `${wine.drinking_window_end} 前优先`
       }))
-      .sort((a, b) => {
-        const aReady = a.drinking_window_start <= year;
-        const bReady = b.drinking_window_start <= year;
-        if (aReady !== bReady) return aReady ? -1 : 1;
-        return aReady
-          ? Number(a.drinking_window_end) - Number(b.drinking_window_end)
-          : Number(a.drinking_window_start) - Number(b.drinking_window_start);
-      }),
+      .sort((a, b) => Number(a.drinking_window_end) - Number(b.drinking_window_end)),
     targets: { color_targets: colorTargets, category_targets: categoryTargets }
   };
 }
