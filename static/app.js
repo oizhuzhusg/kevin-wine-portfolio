@@ -259,6 +259,13 @@ function bottleCodes(wine) {
 }
 
 function storageLocation(wine) {
+  const bottleLocations = [...new Set((wine.bottles || [])
+    .filter(bottle => bottle.status === "in_stock" && bottle.location_text)
+    .map(bottle => bottle.location_text))];
+  if (bottleLocations.length > 1) {
+    return `<span class="storage-location">多处存放 · ${Number(wine.current_inventory || 0)} 瓶</span>`;
+  }
+  if (bottleLocations.length === 1) return `<span class="storage-location">${escapeHtml(bottleLocations[0])}</span>`;
   if (!wine.storage_unit || !wine.storage_shelf) {
     return Number(wine.on_order_inventory || 0) ? '<span class="hint">到货后记录</span>' : '<span class="hint">待记录</span>';
   }

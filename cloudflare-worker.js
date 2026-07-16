@@ -245,6 +245,35 @@ async function api(request, env, pathname) {
     return json(await env.DB.prepare("SELECT * FROM portfolio_targets WHERE id = ?").bind(Number(targetMatch[1])).first());
   }
   if (pathname === "/api/wines" && request.method === "GET") return json(await winesWithBottles(env));
+  if (pathname === "/api/wines/merge" && request.method === "POST") {
+    const body = await requestBody(request);
+    const targetId = Number(body.target_id);
+    const sourceIds = [...new Set((body.source_ids || []).map(Number).filter(id => id && id !== targetId))];
+    if (!targetId || !sourceIds.length) return json({ error: "Target and source wine IDs are required" }, 400);
+
+    const target = await env.DB.prepare("SELECT * FROM wines WHERE id = ?").bind(targetId).first();
+    const sources = (await env.DB.prepare(`SELECT * FROM wines WHERE id IN (${sourceIds.map(() => "?").join(", ")})`).bind(...sourceIds).all()).results;
+    if (!target || sources.length !== sourceIds.length) return json({ error: "Wine record not found" }, 404);
+    const identity = wine => [wine.producer, wine.wine_name, wine.vintage ?? "", wine.color].join("|");
+    if (sources.some(source => identity(source) !== identity(target))) {
+      return json({ error: "Only identical producer, wine, vintage and colour records can be merged" }, 400);
+    }
+
+    const totalCurrent = Number(target.current_inventory || 0) + sources.reduce((sum, wine) => sum + Number(wine.current_inventory || 0), 0);
+    const totalOnOrder = Number(target.on_order_inventory || 0) + sources.reduce((sum, wine) => sum + Number(wine.on_order_inventory || 0), 0);
+    const totalTarget = Number(target.target_inventory || 0) + sources.reduce((sum, wine) => sum + Number(wine.target_inventory || 0), 0);
+    const statements = [
+      env.DB.prepare("UPDATE wines SET current_inventory = ?, on_order_inventory = ?, target_inventory = ?, storage_unit = NULL, storage_shelf = NULL, storage_row = NULL, storage_stack = NULL, storage_slot = NULL, storage_positions = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(totalCurrent, totalOnOrder, totalTarget, targetId)
+    ];
+    for (const sourceId of sourceIds) {
+      statements.push(env.DB.prepare("UPDATE bottles SET wine_id = ?, updated_at = CURRENT_TIMESTAMP WHERE wine_id = ?").bind(targetId, sourceId));
+      statements.push(env.DB.prepare("UPDATE purchases SET wine_id = ? WHERE wine_id = ?").bind(targetId, sourceId));
+      statements.push(env.DB.prepare("DELETE FROM wines WHERE id = ?").bind(sourceId));
+    }
+    await env.DB.batch(statements);
+    return json({ ok: true, target_id: targetId, merged_source_ids: sourceIds });
+  }
   if (pathname === "/api/wines" && request.method === "POST") {
     const body = await requestBody(request);
     const fields = ["producer", "wine_name", "region", "country", "appellation", "vineyard_or_climat", "classification", "grape_variety", "color", "vintage", "drinking_window_start", "drinking_window_end", "ideal_price_sgd", "max_price_sgd", "current_market_price_sgd", "current_inventory", "on_order_inventory", "target_inventory", "storage_unit", "storage_shelf", "storage_row", "storage_stack", "storage_slot", "storage_positions", "personal_score", "portfolio_role_reason", "wine_introduction", "current_drinking_advice", "decanting_advice", "notes"];
