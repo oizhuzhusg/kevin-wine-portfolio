@@ -42,7 +42,7 @@ const SCHEMA_STATEMENTS = [
     title TEXT NOT NULL, notes TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
   `CREATE TABLE IF NOT EXISTS tasting_event_wines (
     event_id INTEGER NOT NULL, wine_id INTEGER NOT NULL, serving_order INTEGER NOT NULL,
-    service_note TEXT, PRIMARY KEY (event_id, wine_id),
+    bottle_code TEXT, service_note TEXT, PRIMARY KEY (event_id, wine_id),
     FOREIGN KEY (event_id) REFERENCES tasting_events(id) ON DELETE CASCADE,
     FOREIGN KEY (wine_id) REFERENCES wines(id) ON DELETE CASCADE)`
 ];
@@ -62,7 +62,8 @@ const SCHEMA_UPDATES = [
   "ALTER TABLE wines ADD COLUMN storage_stack TEXT",
   "ALTER TABLE wines ADD COLUMN storage_slot INTEGER",
   "ALTER TABLE wines ADD COLUMN current_market_price_sgd REAL",
-  "ALTER TABLE wines ADD COLUMN storage_positions TEXT"
+  "ALTER TABLE wines ADD COLUMN storage_positions TEXT",
+  "ALTER TABLE tasting_event_wines ADD COLUMN bottle_code TEXT"
 ];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
@@ -216,7 +217,7 @@ async function api(request, env, pathname) {
   if (pathname === "/api/tasting-events" && request.method === "GET") {
     const events = (await env.DB.prepare("SELECT * FROM tasting_events ORDER BY event_date ASC, id ASC").all()).results;
     const items = (await env.DB.prepare(`SELECT tasting_event_wines.event_id, tasting_event_wines.wine_id,
-      tasting_event_wines.serving_order, tasting_event_wines.service_note,
+      tasting_event_wines.serving_order, tasting_event_wines.bottle_code, tasting_event_wines.service_note,
       wines.producer, wines.wine_name, wines.vintage, wines.color
       FROM tasting_event_wines JOIN wines ON wines.id = tasting_event_wines.wine_id
       ORDER BY tasting_event_wines.serving_order ASC`).all()).results;
@@ -234,8 +235,8 @@ async function api(request, env, pathname) {
       .bind(eventDate, title, body.notes || null).run();
     const eventId = result.meta.last_row_id;
     const statements = wines.map((wine, index) => env.DB.prepare(
-      "INSERT INTO tasting_event_wines (event_id, wine_id, serving_order, service_note) VALUES (?, ?, ?, ?)"
-    ).bind(eventId, Number(wine.wine_id), Number(wine.serving_order || index + 1), wine.service_note || null));
+      "INSERT INTO tasting_event_wines (event_id, wine_id, serving_order, bottle_code, service_note) VALUES (?, ?, ?, ?, ?)"
+    ).bind(eventId, Number(wine.wine_id), Number(wine.serving_order || index + 1), wine.bottle_code || null, wine.service_note || null));
     await env.DB.batch(statements);
     return json({ ok: true, id: eventId }, 201);
   }

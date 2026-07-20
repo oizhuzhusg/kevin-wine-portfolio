@@ -154,7 +154,7 @@ function renderTastingEvents() {
   container.innerHTML = upcoming.map(event => `
     <article class="tasting-event">
       <div class="tasting-event-head"><strong>${eventDateLabel(event.event_date)} · ${escapeHtml(event.title)}</strong><span>${event.wines.length} 支</span></div>
-      <ol>${event.wines.map(wine => `<li><strong>${wine.serving_order}. ${escapeHtml(wine.producer)} · ${escapeHtml(wine.wine_name)} ${wine.vintage || ""}</strong>${wine.service_note ? `<span>${escapeHtml(wine.service_note)}</span>` : ""}</li>`).join("")}</ol>
+      <ol>${event.wines.map(wine => `<li><strong>${wine.serving_order}. ${escapeHtml(wine.producer)} · ${escapeHtml(wine.wine_name)} ${wine.vintage || ""}</strong><span>${wine.bottle_code ? `瓶号 ${escapeHtml(wine.bottle_code)} · ` : ""}${escapeHtml(wine.service_note || "")}</span></li>`).join("")}</ol>
       ${event.notes ? `<p>${escapeHtml(event.notes)}</p>` : ""}
     </article>
   `).join("");
@@ -234,7 +234,7 @@ function tastingEventLabel(wineId) {
     .filter(wine => Number(wine.wine_id) === Number(wineId))
     .map(wine => ({ event, wine })));
   if (!matches.length) return '<span class="hint">-</span>';
-  return matches.map(({ event, wine }) => `<span class="tasting-plan-tag">${eventDateLabel(event.event_date)} · 第 ${wine.serving_order} 支</span>`).join(" ");
+  return matches.map(({ event, wine }) => `<span class="tasting-plan-tag">${eventDateLabel(event.event_date)} · 第 ${wine.serving_order} 支${wine.bottle_code ? ` · ${escapeHtml(wine.bottle_code)}` : ""}</span>`).join(" ");
 }
 
 function renderMobileInventory(rows) {
