@@ -93,6 +93,14 @@ async function loadWines() {
 
 async function loadTastingEvents() {
   state.tastingEvents = await api("/api/tasting-events");
+  const select = $("#filter-tasting-event");
+  if (!select) return;
+  const selected = select.value;
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = state.tastingEvents.filter(event => event.event_date >= today);
+  select.innerHTML = '<option value="">全部酒局</option><option value="planned">已排入近期酒局</option>'
+    + upcoming.map(event => `<option value="${event.id}">${eventDateLabel(event.event_date)} · ${escapeHtml(event.title)}</option>`).join("");
+  select.value = [...select.options].some(option => option.value === selected) ? selected : "";
 }
 
 async function renderDashboard() {
@@ -174,14 +182,19 @@ function renderInventory() {
   const cabinet = $("#filter-cabinet").value;
   const color = $("#filter-color").value;
   const category = $("#filter-category").value;
+  const tastingEvent = $("#filter-tasting-event").value;
   const sort = $("#inventory-sort").value;
+  const plannedWineIds = new Set(state.tastingEvents.flatMap(event => event.wines.map(wine => Number(wine.wine_id))));
   const rows = state.wines.filter(w => {
     const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
     const hasLocation = Boolean(w.storage_unit && w.storage_shelf);
     return (!q || text.includes(q))
       && (!cabinet || (cabinet === "unassigned" ? !hasLocation : w.storage_unit === cabinet))
       && (!color || w.color === color)
-      && (!category || w.category_tags.includes(category));
+      && (!category || w.category_tags.includes(category))
+      && (!tastingEvent || (tastingEvent === "planned"
+        ? plannedWineIds.has(Number(w.id))
+        : state.tastingEvents.some(event => String(event.id) === tastingEvent && event.wines.some(wine => Number(wine.wine_id) === Number(w.id)))));
   });
   if (sort !== "default") {
     const direction = sort === "window-asc" ? 1 : -1;
@@ -431,6 +444,7 @@ function wireEvents() {
   $("#filter-cabinet").addEventListener("change", renderInventory);
   $("#filter-color").addEventListener("change", renderInventory);
   $("#filter-category").addEventListener("change", renderInventory);
+  $("#filter-tasting-event").addEventListener("change", renderInventory);
   $("#inventory-sort").addEventListener("change", renderInventory);
   $("#purchase-search").addEventListener("input", renderPurchaseTable);
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
