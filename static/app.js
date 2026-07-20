@@ -99,7 +99,7 @@ async function loadTastingEvents() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = state.tastingEvents.filter(event => event.event_date >= today);
   select.innerHTML = '<option value="">全部酒局</option><option value="planned">已排入近期酒局</option>'
-    + upcoming.map(event => `<option value="${event.id}">${eventDateLabel(event.event_date)} · ${escapeHtml(event.title)}</option>`).join("");
+    + upcoming.map(event => `<option value="${event.id}">${escapeHtml(eventLabel(event))}</option>`).join("");
   select.value = [...select.options].some(option => option.value === selected) ? selected : "";
 }
 
@@ -148,7 +148,11 @@ async function renderDashboard() {
 function eventDateLabel(value) {
   if (!value) return "";
   const [year, month, day] = value.split("-");
-  return `${Number(month)} 月 ${Number(day)} 日`;
+  return `${year} 年 ${Number(month)} 月 ${Number(day)} 日`;
+}
+
+function eventLabel(event) {
+  return `${eventDateLabel(event.event_date)} ${event.title}`;
 }
 
 function renderTastingEvents() {
@@ -161,7 +165,7 @@ function renderTastingEvents() {
   }
   container.innerHTML = upcoming.map(event => `
     <article class="tasting-event">
-      <div class="tasting-event-head"><strong>${eventDateLabel(event.event_date)} · ${escapeHtml(event.title)}</strong><span>${event.wines.length} 支</span></div>
+      <div class="tasting-event-head"><strong>${escapeHtml(eventLabel(event))}</strong><span>${event.wines.length} 支</span></div>
       <ol>${event.wines.map(wine => `<li><strong>${wine.serving_order}. ${escapeHtml(wine.producer)} · ${escapeHtml(wine.wine_name)} ${wine.vintage || ""}</strong><span>${wine.bottle_code ? `瓶号 ${escapeHtml(wine.bottle_code)} · ` : ""}${escapeHtml(wine.service_note || "")}</span></li>`).join("")}</ol>
       ${event.notes ? `<p>${escapeHtml(event.notes)}</p>` : ""}
     </article>

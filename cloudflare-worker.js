@@ -241,6 +241,14 @@ async function api(request, env, pathname) {
     return json({ ok: true, id: eventId }, 201);
   }
   const tastingEventMatch = pathname.match(/^\/api\/tasting-events\/(\d+)$/);
+  if (tastingEventMatch && request.method === "PATCH") {
+    const eventId = Number(tastingEventMatch[1]);
+    const body = await requestBody(request);
+    const title = String(body.title || "").trim();
+    if (!title) return json({ error: "Event title is required" }, 400);
+    await env.DB.prepare("UPDATE tasting_events SET title = ? WHERE id = ?").bind(title, eventId).run();
+    return json(await env.DB.prepare("SELECT * FROM tasting_events WHERE id = ?").bind(eventId).first());
+  }
   if (tastingEventMatch && request.method === "DELETE") {
     const eventId = Number(tastingEventMatch[1]);
     await env.DB.batch([
