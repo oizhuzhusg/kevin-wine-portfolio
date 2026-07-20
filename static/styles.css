@@ -212,6 +212,28 @@ tr:hover td { background: #fafafa; }
 }
 .stock-delivered { background: #e6f3ea; color: #166534; }
 .stock-ordered { background: #fff3dc; color: #9a5800; }
+.tasting-plan-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d6b26d;
+  border-radius: 999px;
+  background: #fff8e9;
+  color: #795612;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+.tasting-event { border-top: 1px solid var(--line); padding: 12px 0; }
+.tasting-event:first-child { border-top: 0; padding-top: 0; }
+.tasting-event:last-child { padding-bottom: 0; }
+.tasting-event-head { display: flex; justify-content: space-between; gap: 12px; }
+.tasting-event-head span, .tasting-event li span, .tasting-event p { color: var(--muted); font-size: 13px; }
+.tasting-event ol { margin: 9px 0 0; padding-left: 21px; }
+.tasting-event li { padding: 3px 0; }
+.tasting-event li span { display: block; margin-top: 2px; }
+.tasting-event p { margin: 9px 0 0; }
 .star-rating {
   display: inline-flex;
   gap: 2px;

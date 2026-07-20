@@ -36,7 +36,15 @@ const SCHEMA_STATEMENTS = [
     id INTEGER PRIMARY KEY AUTOINCREMENT, bottle_code TEXT UNIQUE,
     wine_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'in_stock',
     location_text TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE TABLE IF NOT EXISTS tasting_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL,
+    title TEXT NOT NULL, notes TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE TABLE IF NOT EXISTS tasting_event_wines (
+    event_id INTEGER NOT NULL, wine_id INTEGER NOT NULL, serving_order INTEGER NOT NULL,
+    service_note TEXT, PRIMARY KEY (event_id, wine_id),
+    FOREIGN KEY (event_id) REFERENCES tasting_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (wine_id) REFERENCES wines(id) ON DELETE CASCADE)`
 ];
 
 const SCHEMA_UPDATES = [
@@ -205,6 +213,32 @@ async function dashboard(env) {
 async function api(request, env, pathname) {
   if (pathname === "/api/lookups" && request.method === "GET") return json({ categories: CATEGORIES, colors: COLORS, watchlist: [] });
   if (pathname === "/api/dashboard" && request.method === "GET") return json(await dashboard(env));
+  if (pathname === "/api/tasting-events" && request.method === "GET") {
+    const events = (await env.DB.prepare("SELECT * FROM tasting_events ORDER BY event_date ASC, id ASC").all()).results;
+    const items = (await env.DB.prepare(`SELECT tasting_event_wines.event_id, tasting_event_wines.wine_id,
+      tasting_event_wines.serving_order, tasting_event_wines.service_note,
+      wines.producer, wines.wine_name, wines.vintage, wines.color
+      FROM tasting_event_wines JOIN wines ON wines.id = tasting_event_wines.wine_id
+      ORDER BY tasting_event_wines.serving_order ASC`).all()).results;
+    return json(events.map(event => ({ ...event, wines: items.filter(item => item.event_id === event.id) })));
+  }
+  if (pathname === "/api/tasting-events" && request.method === "POST") {
+    const body = await requestBody(request);
+    const eventDate = String(body.event_date || "");
+    const title = String(body.title || "").trim();
+    const wines = Array.isArray(body.wines) ? body.wines : [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !title || !wines.length) {
+      return json({ error: "Event date, title and at least one wine are required" }, 400);
+    }
+    const result = await env.DB.prepare("INSERT INTO tasting_events (event_date, title, notes) VALUES (?, ?, ?)")
+      .bind(eventDate, title, body.notes || null).run();
+    const eventId = result.meta.last_row_id;
+    const statements = wines.map((wine, index) => env.DB.prepare(
+      "INSERT INTO tasting_event_wines (event_id, wine_id, serving_order, service_note) VALUES (?, ?, ?, ?)"
+    ).bind(eventId, Number(wine.wine_id), Number(wine.serving_order || index + 1), wine.service_note || null));
+    await env.DB.batch(statements);
+    return json({ ok: true, id: eventId }, 201);
+  }
   if (pathname === "/api/bottles" && request.method === "GET") {
     return json((await env.DB.prepare("SELECT bottles.*, wines.producer, wines.wine_name, wines.vintage FROM bottles JOIN wines ON wines.id = bottles.wine_id ORDER BY bottles.id").all()).results);
   }

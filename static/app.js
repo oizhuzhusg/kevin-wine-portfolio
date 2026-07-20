@@ -2,7 +2,8 @@ const state = {
   wines: [],
   lookups: { categories: [], colors: [] },
   purchases: [],
-  portfolioTargets: []
+  portfolioTargets: [],
+  tastingEvents: []
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -90,6 +91,10 @@ async function loadWines() {
   renderInventory();
 }
 
+async function loadTastingEvents() {
+  state.tastingEvents = await api("/api/tasting-events");
+}
+
 async function renderDashboard() {
   const data = await api("/api/dashboard");
   const colorTargets = data.targets.color_targets;
@@ -116,6 +121,10 @@ async function renderDashboard() {
       <h3>优先开瓶</h3>
       <div class="table-wrap" id="window-table"></div>
     </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>近期酒局</h3>
+      <div id="tasting-events"></div>
+    </div>
   `;
   renderTable($("#window-table"), [
     { label: "Producer", key: "producer" },
@@ -125,6 +134,30 @@ async function renderDashboard() {
     { label: "Status", key: "window_status" },
     { label: "Stock", render: r => inventoryStatus(r) }
   ], data.priority_to_open);
+  renderTastingEvents();
+}
+
+function eventDateLabel(value) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${Number(month)} 月 ${Number(day)} 日`;
+}
+
+function renderTastingEvents() {
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = state.tastingEvents.filter(event => event.event_date >= today);
+  const container = $("#tasting-events");
+  if (!upcoming.length) {
+    container.innerHTML = '<p class="hint">暂无已安排酒局</p>';
+    return;
+  }
+  container.innerHTML = upcoming.map(event => `
+    <article class="tasting-event">
+      <div class="tasting-event-head"><strong>${eventDateLabel(event.event_date)} · ${escapeHtml(event.title)}</strong><span>${event.wines.length} 支</span></div>
+      <ol>${event.wines.map(wine => `<li><strong>${wine.serving_order}. ${escapeHtml(wine.producer)} · ${escapeHtml(wine.wine_name)} ${wine.vintage || ""}</strong>${wine.service_note ? `<span>${escapeHtml(wine.service_note)}</span>` : ""}</li>`).join("")}</ol>
+      ${event.notes ? `<p>${escapeHtml(event.notes)}</p>` : ""}
+    </article>
+  `).join("");
 }
 
 function bar(label, current, target, count) {
@@ -176,6 +209,7 @@ function renderInventory() {
     { label: "Location", render: r => storageLocation(r) },
     { label: "Target", key: "target_inventory" },
     { label: "Best Window", render: r => `${r.drinking_window_start || "-"}-${r.drinking_window_end || "-"}` },
+    { label: "酒局", render: r => tastingEventLabel(r.id) },
     { label: "Now / Decant", render: r => `<span class="hint">${escapeHtml(r.current_drinking_advice || "-")}<br>${escapeHtml(r.decanting_advice || "")}</span>` },
     { label: "参考市价", render: r => money(r.current_market_price_sgd) },
     { label: "参考理想价", render: r => money(r.ideal_price_sgd) },
@@ -193,6 +227,14 @@ function renderInventory() {
       await refreshAll();
     });
   });
+}
+
+function tastingEventLabel(wineId) {
+  const matches = state.tastingEvents.flatMap(event => event.wines
+    .filter(wine => Number(wine.wine_id) === Number(wineId))
+    .map(wine => ({ event, wine })));
+  if (!matches.length) return '<span class="hint">-</span>';
+  return matches.map(({ event, wine }) => `<span class="tasting-plan-tag">${eventDateLabel(event.event_date)} · 第 ${wine.serving_order} 支</span>`).join(" ");
 }
 
 function renderMobileInventory(rows) {
@@ -217,6 +259,7 @@ function renderMobileInventory(rows) {
         </summary>
         <div class="mobile-wine-details">
           <div class="mobile-detail-row"><span>最佳适饮期</span><strong>${window}</strong></div>
+          <div class="mobile-detail-row"><span>酒局计划</span><span>${tastingEventLabel(wine.id)}</span></div>
           <div class="mobile-detail-row"><span>状态 / 目标</span><span>${inventoryStatus(wine)} / ${wine.target_inventory || 0}</span></div>
           <div class="mobile-detail-row"><span>酒柜位置</span><strong>${storageLocation(wine)}</strong></div>
           <div class="mobile-detail-row"><span>独立编号</span><strong>${bottleCodes(wine)}</strong></div>
@@ -372,6 +415,7 @@ function normalize(value) {
 }
 
 async function refreshAll() {
+  await loadTastingEvents();
   await Promise.all([renderDashboard(), loadWines(), renderPurchases(), loadPortfolioTargets()]);
 }
 
