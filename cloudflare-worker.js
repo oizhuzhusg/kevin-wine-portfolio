@@ -261,6 +261,19 @@ async function api(request, env, pathname) {
     return json((await env.DB.prepare("SELECT bottles.*, wines.producer, wines.wine_name, wines.vintage FROM bottles JOIN wines ON wines.id = bottles.wine_id ORDER BY bottles.id").all()).results);
   }
   const bottleMatch = pathname.match(/^\/api\/bottles\/(B-\d+)$/);
+  if (bottleMatch && request.method === "DELETE") {
+    const bottle = await env.DB.prepare(`
+      SELECT bottles.*, wines.on_order_inventory
+      FROM bottles JOIN wines ON wines.id = bottles.wine_id
+      WHERE bottles.bottle_code = ?
+    `).bind(bottleMatch[1]).first();
+    if (!bottle) return json({ error: "Bottle not found" }, 404);
+    if (bottle.status !== "on_order" || Number(bottle.on_order_inventory || 0) > 0) {
+      return json({ error: "Only obsolete delivered-order placeholders can be removed" }, 400);
+    }
+    await env.DB.prepare("DELETE FROM bottles WHERE bottle_code = ?").bind(bottleMatch[1]).run();
+    return json({ ok: true, bottle_code: bottleMatch[1] });
+  }
   if (bottleMatch && request.method === "PATCH") {
     const body = await requestBody(request);
     const entries = Object.entries(body).filter(([key]) => ["status", "location_text"].includes(key));
@@ -375,6 +388,19 @@ async function api(request, env, pathname) {
       const fromColumn = existing.fulfillment_status === "delivered" ? "current_inventory" : "on_order_inventory";
       const toColumn = nextStatus === "delivered" ? "current_inventory" : "on_order_inventory";
       statements.push(env.DB.prepare(`UPDATE wines SET ${fromColumn} = MAX(0, ${fromColumn} - ?), ${toColumn} = ${toColumn} + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(existing.quantity, existing.quantity, existing.wine_id));
+
+      // Preserve bottle identities when an order arrives instead of creating a second code.
+      const sourceStatus = existing.fulfillment_status === "delivered" ? "in_stock" : "on_order";
+      const targetStatus = nextStatus === "delivered" ? "in_stock" : "on_order";
+      const sourceBottles = (await env.DB.prepare(
+        "SELECT id FROM bottles WHERE wine_id = ? AND status = ? ORDER BY id LIMIT ?"
+      ).bind(existing.wine_id, sourceStatus, existing.quantity).all()).results;
+      for (const bottle of sourceBottles) {
+        const locationText = targetStatus === "on_order" ? "运输中" : null;
+        statements.push(env.DB.prepare(
+          "UPDATE bottles SET status = ?, location_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(targetStatus, locationText, bottle.id));
+      }
     }
     await env.DB.batch(statements);
     return json(await env.DB.prepare("SELECT purchases.*, wines.producer, wines.wine_name, wines.vintage FROM purchases JOIN wines ON wines.id = purchases.wine_id WHERE purchases.id = ?").bind(existing.id).first());
