@@ -10,14 +10,14 @@
     <header class="topbar">
       <div>
         <h1>Kevin Wine Portfolio</h1>
-        <p>个人酒窖库存、购买记录与 1-5 星偏好管理</p>
+        <p>个人酒窖库存、流转记录与品鉴笔记</p>
       </div>
       <nav class="tabs" aria-label="Primary">
         <button class="tab active" data-view="dashboard">Dashboard</button>
         <button class="tab" data-view="recommendations">Recommended</button>
         <button class="tab" data-view="inventory">Inventory</button>
-        <button class="tab" data-view="history">History</button>
-        <button class="tab" data-view="purchases">Purchases</button>
+        <button class="tab" data-view="cellar-log">Cellar Log</button>
+        <button class="tab" data-view="tasting-notes">Tasting Notes</button>
       </nav>
     </header>
 
@@ -74,30 +74,38 @@
         </div>
       </section>
 
-      <section id="history" class="view">
+      <section id="cellar-log" class="view">
         <div class="toolbar">
-          <h2>History</h2>
+          <h2>Cellar Log</h2>
           <div class="filters">
-            <input id="history-search" placeholder="搜索已喝酒款、生产者、年份" />
+            <input id="cellar-log-search" placeholder="搜索酒款、生产者、商家或瓶号" />
+            <select id="cellar-log-type">
+              <option value="">全部流转</option>
+              <option value="purchased">购买 / 下单</option>
+              <option value="received">到货 / 入库</option>
+              <option value="moved">位置变更</option>
+              <option value="consumed">开瓶 / 出库</option>
+            </select>
           </div>
         </div>
         <div class="panel">
-          <h3>饮酒记录</h3>
-          <p class="hint">每一条对应一支已饮用的独立瓶号，保留当时的评分与品鉴笔记。</p>
-          <div id="history-table" class="table-wrap"></div>
+          <h3>酒窖流转</h3>
+          <p class="hint">只记录酒的购买、到货、位置和出库，确保库存与实际酒柜一致。</p>
+          <div id="cellar-log-table" class="table-wrap"></div>
         </div>
       </section>
 
-      <section id="purchases" class="view">
+      <section id="tasting-notes" class="view">
         <div class="toolbar">
-          <h2>Purchases</h2>
+          <h2>Tasting Notes</h2>
           <div class="filters">
-            <input id="purchase-search" placeholder="搜索生产者、酒款、年份、商家" />
+            <input id="tasting-note-search" placeholder="搜索品饮过的酒、生产者、年份或感受" />
           </div>
         </div>
         <div class="panel">
-          <h3>购买历史</h3>
-          <div id="purchase-table" class="table-wrap"></div>
+          <h3>品鉴反馈</h3>
+          <p class="hint">外面喝的酒只在这里记录；家里开瓶时，库存出库与品鉴感受也分别保存。</p>
+          <div id="tasting-note-table" class="table-wrap"></div>
         </div>
       </section>
 

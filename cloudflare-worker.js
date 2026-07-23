@@ -45,7 +45,17 @@ const SCHEMA_STATEMENTS = [
     event_id INTEGER NOT NULL, wine_id INTEGER NOT NULL, serving_order INTEGER NOT NULL,
     bottle_code TEXT, service_note TEXT, PRIMARY KEY (event_id, wine_id),
     FOREIGN KEY (event_id) REFERENCES tasting_events(id) ON DELETE CASCADE,
-    FOREIGN KEY (wine_id) REFERENCES wines(id) ON DELETE CASCADE)`
+    FOREIGN KEY (wine_id) REFERENCES wines(id) ON DELETE CASCADE)`,
+  `CREATE TABLE IF NOT EXISTS cellar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL,
+    event_type TEXT NOT NULL, wine_id INTEGER, bottle_code TEXT, quantity INTEGER NOT NULL DEFAULT 1,
+    details TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE TABLE IF NOT EXISTS tasting_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, tasting_date TEXT,
+    source TEXT NOT NULL DEFAULT 'external', venue TEXT, wine_id INTEGER,
+    producer TEXT NOT NULL, wine_name TEXT NOT NULL, vintage INTEGER,
+    region TEXT, color TEXT, score REAL, notes TEXT, would_drink_again TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`
 ];
 
 const SCHEMA_UPDATES = [
@@ -264,6 +274,51 @@ async function api(request, env, pathname) {
   if (pathname === "/api/bottles" && request.method === "GET") {
     return json((await env.DB.prepare("SELECT bottles.*, wines.producer, wines.wine_name, wines.vintage FROM bottles JOIN wines ON wines.id = bottles.wine_id ORDER BY bottles.id").all()).results);
   }
+  if (pathname === "/api/cellar-log" && request.method === "GET") {
+    return json((await env.DB.prepare(`
+      SELECT * FROM (
+        SELECT purchases.purchase_date AS event_date, 'purchased' AS event_type, purchases.wine_id,
+          NULL AS bottle_code, purchases.quantity, purchases.merchant AS details, purchases.created_at,
+          wines.producer, wines.wine_name, wines.vintage
+        FROM purchases JOIN wines ON wines.id = purchases.wine_id
+        UNION ALL
+        SELECT COALESCE(purchases.delivered_date, purchases.purchase_date), 'received', purchases.wine_id,
+          NULL, purchases.quantity, purchases.merchant, purchases.created_at,
+          wines.producer, wines.wine_name, wines.vintage
+        FROM purchases JOIN wines ON wines.id = purchases.wine_id
+        WHERE purchases.fulfillment_status = 'delivered'
+        UNION ALL
+        SELECT bottles.consumed_at, 'consumed', bottles.wine_id, bottles.bottle_code, 1,
+          NULL, bottles.updated_at, wines.producer, wines.wine_name, wines.vintage
+        FROM bottles JOIN wines ON wines.id = bottles.wine_id
+        WHERE bottles.status = 'consumed'
+        UNION ALL
+        SELECT cellar_events.event_date, cellar_events.event_type, cellar_events.wine_id,
+          cellar_events.bottle_code, cellar_events.quantity, cellar_events.details, cellar_events.created_at,
+          wines.producer, wines.wine_name, wines.vintage
+        FROM cellar_events LEFT JOIN wines ON wines.id = cellar_events.wine_id
+      ) ORDER BY event_date DESC, created_at DESC
+    `).all()).results);
+  }
+  if (pathname === "/api/tasting-notes" && request.method === "GET") {
+    return json((await env.DB.prepare(`
+      SELECT * FROM tasting_notes
+      ORDER BY CASE WHEN tasting_date IS NULL THEN 1 ELSE 0 END, tasting_date DESC, created_at DESC
+    `).all()).results);
+  }
+  if (pathname === "/api/tasting-notes" && request.method === "POST") {
+    const body = await requestBody(request);
+    const producer = String(body.producer || "").trim();
+    const wineName = String(body.wine_name || "").trim();
+    if (!producer || !wineName) return json({ error: "Producer and wine name are required" }, 400);
+    const result = await env.DB.prepare(`INSERT INTO tasting_notes
+      (tasting_date, source, venue, wine_id, producer, wine_name, vintage, region, color, score, notes, would_drink_again)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(body.tasting_date || null, body.source || 'external', body.venue || null, body.wine_id || null,
+        producer, wineName, body.vintage || null, body.region || null, body.color || null,
+        body.score ?? null, body.notes || null, body.would_drink_again || null).run();
+    return json(await env.DB.prepare("SELECT * FROM tasting_notes WHERE id = ?").bind(result.meta.last_row_id).first(), 201);
+  }
   if (pathname === "/api/history" && request.method === "GET") {
     return json((await env.DB.prepare(`
       SELECT bottles.bottle_code, bottles.consumed_at, bottles.tasting_score, bottles.tasting_notes,
@@ -316,11 +371,21 @@ async function api(request, env, pathname) {
     return json({ ok: true, bottle_code: bottleMatch[1] });
   }
   if (bottleMatch && request.method === "PATCH") {
+    const existing = await env.DB.prepare("SELECT * FROM bottles WHERE bottle_code = ?").bind(bottleMatch[1]).first();
+    if (!existing) return json({ error: "Bottle not found" }, 404);
     const body = await requestBody(request);
     const entries = Object.entries(body).filter(([key]) => ["status", "location_text", "consumed_at", "tasting_score", "tasting_notes"].includes(key));
     if (!entries.length) return json({ error: "No editable fields supplied" }, 400);
     await env.DB.prepare(`UPDATE bottles SET ${entries.map(([key]) => `${key} = ?`).join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE bottle_code = ?`)
       .bind(...entries.map(([, value]) => value), bottleMatch[1]).run();
+    if (body.location_text !== undefined && body.location_text !== existing.location_text) {
+      const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.event_date || ""))
+        ? String(body.event_date)
+        : new Date().toISOString().slice(0, 10);
+      await env.DB.prepare(`INSERT INTO cellar_events (event_date, event_type, wine_id, bottle_code, details)
+        VALUES (?, 'moved', ?, ?, ?)`)
+        .bind(eventDate, existing.wine_id, bottleMatch[1], body.location_text || "待记录位置").run();
+    }
     return json(await env.DB.prepare("SELECT * FROM bottles WHERE bottle_code = ?").bind(bottleMatch[1]).first());
   }
   if (pathname === "/api/portfolio-targets" && request.method === "GET") {

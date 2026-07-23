@@ -214,6 +214,21 @@ tr:hover td { background: #fafafa; }
 .stock-ordered { background: #fff3dc; color: #9a5800; }
 .score { color: var(--accent); white-space: nowrap; }
 .history-note { display: inline-block; min-width: 240px; max-width: 520px; line-height: 1.55; }
+.log-event {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.log-purchased { background: #fff3dc; color: #9a5800; }
+.log-received, .log-home { background: #e6f3ea; color: #166534; }
+.log-moved { background: #eef3f8; color: #29485f; }
+.log-consumed, .log-external { background: #f8e9ed; color: #8f2f3f; }
 .tasting-plan-tag {
   display: inline-flex;
   align-items: center;

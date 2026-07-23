@@ -1,10 +1,10 @@
 const state = {
   wines: [],
   lookups: { categories: [], colors: [] },
-  purchases: [],
   portfolioTargets: [],
   tastingEvents: [],
-  history: []
+  cellarLog: [],
+  tastingNotes: []
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -326,57 +326,58 @@ function storageLocation(wine) {
   return `<span class="storage-location">${parts.join(" · ")}</span>`;
 }
 
-async function renderPurchases() {
-  state.purchases = await api("/api/purchases");
-  renderPurchaseTable();
+const cellarEventLabel = type => ({
+  purchased: "购买 / 下单",
+  received: "到货 / 入库",
+  moved: "位置变更",
+  consumed: "开瓶 / 出库"
+}[type] || type);
+
+async function loadCellarLog() {
+  state.cellarLog = await api("/api/cellar-log");
+  renderCellarLog();
 }
 
-async function loadHistory() {
-  state.history = await api("/api/history");
-  renderHistory();
-}
-
-function renderHistory() {
-  const query = normalize($("#history-search").value);
-  const rows = state.history.filter(record => {
-    const text = normalize(`${record.producer} ${record.wine_name} ${record.vintage} ${record.appellation} ${record.tasting_notes}`);
-    return !query || text.includes(query);
+function renderCellarLog() {
+  const query = normalize($("#cellar-log-search").value);
+  const type = $("#cellar-log-type").value;
+  const rows = state.cellarLog.filter(record => {
+    const text = normalize(`${record.producer} ${record.wine_name} ${record.vintage} ${record.bottle_code} ${record.details}`);
+    return (!query || text.includes(query)) && (!type || record.event_type === type);
   });
-  renderTable($("#history-table"), [
-    { label: "Date", render: r => eventDateLabel(r.consumed_at) || "-" },
+  renderTable($("#cellar-log-table"), [
+    { label: "Date", render: r => eventDateLabel(r.event_date) || "-" },
+    { label: "Event", render: r => `<span class="log-event log-${escapeHtml(r.event_type)}">${cellarEventLabel(r.event_type)}</span>` },
     { label: "Producer", key: "producer" },
-    { label: "Wine", render: r => `${escapeHtml(r.wine_name)}<br><span class="hint">${escapeHtml(r.appellation || "")}</span>` },
-    { label: "Vintage", key: "vintage" },
-    { label: "Bottle", render: r => `<span class="bottle-code">${escapeHtml(r.bottle_code)}</span>` },
-    { label: "Rating", render: r => scoreDisplay(r.tasting_score ?? r.personal_score) },
-    { label: "Tasting Note", render: r => `<span class="history-note">${escapeHtml(r.tasting_notes || "-")}</span>` }
+    { label: "Wine", render: r => `${escapeHtml(r.wine_name || "-")}<br><span class="hint">${r.vintage || ""}</span>` },
+    { label: "Qty", render: r => r.quantity || 1 },
+    { label: "Bottle", render: r => r.bottle_code ? `<span class="bottle-code">${escapeHtml(r.bottle_code)}</span>` : '<span class="hint">-</span>' },
+    { label: "Details", render: r => `<span class="history-note">${escapeHtml(r.details || "-")}</span>` }
   ], rows);
 }
 
-function renderPurchaseTable() {
-  const query = normalize($("#purchase-search").value);
-  const rows = state.purchases.filter(purchase => {
-    const text = normalize(`${purchase.producer} ${purchase.wine_name} ${purchase.vintage} ${purchase.merchant}`);
+const tastingSourceLabel = source => ({ home: "家里开瓶", external: "外出品饮" }[source] || source || "外出品饮");
+
+async function loadTastingNotes() {
+  state.tastingNotes = await api("/api/tasting-notes");
+  renderTastingNotes();
+}
+
+function renderTastingNotes() {
+  const query = normalize($("#tasting-note-search").value);
+  const rows = state.tastingNotes.filter(note => {
+    const text = normalize(`${note.producer} ${note.wine_name} ${note.vintage} ${note.region} ${note.venue} ${note.notes}`);
     return !query || text.includes(query);
   });
-  renderTable($("#purchase-table"), [
-    { label: "Date", key: "purchase_date" },
-    { label: "Wine", render: r => `${r.producer} - ${r.wine_name}<br><span class="hint">${r.vintage || ""}</span>` },
-    { label: "Merchant", key: "merchant" },
-    { label: "Price", render: r => money(r.price_sgd) },
-    { label: "Qty", key: "quantity" },
-    { label: "Status", render: r => purchaseStatus(r) },
-    { label: "Total", render: r => money(r.total_cost) },
-    { label: "Reason", key: "purchase_reason" }
+  renderTable($("#tasting-note-table"), [
+    { label: "Date", render: r => eventDateLabel(r.tasting_date) || '<span class="hint">此前记录</span>' },
+    { label: "Context", render: r => `<span class="log-event log-${escapeHtml(r.source || 'external')}">${tastingSourceLabel(r.source)}</span>${r.venue ? `<br><span class="hint">${escapeHtml(r.venue)}</span>` : ""}` },
+    { label: "Producer", key: "producer" },
+    { label: "Wine", render: r => `${escapeHtml(r.wine_name)}<br><span class="hint">${escapeHtml(r.region || "")} ${r.vintage || ""}</span>` },
+    { label: "Rating", render: r => scoreDisplay(r.score) },
+    { label: "Tasting Note", render: r => `<span class="history-note">${escapeHtml(r.notes || "-")}</span>` },
+    { label: "Again", render: r => r.would_drink_again || '<span class="hint">-</span>' }
   ], rows);
-}
-
-function purchaseStatus(purchase) {
-  if (purchase.fulfillment_status === "delivered") {
-    return '<span class="stock-status stock-delivered">已到货</span>';
-  }
-  const eta = purchase.estimated_delivery_date ? `预计 ${purchase.estimated_delivery_date}` : "待确认送达";
-  return `<span class="stock-status stock-ordered">已下单</span><br><span class="hint">${eta}</span>`;
 }
 
 async function loadPortfolioTargets() {
@@ -442,7 +443,7 @@ function normalize(value) {
 
 async function refreshAll() {
   await loadTastingEvents();
-  await Promise.all([renderDashboard(), loadWines(), loadHistory(), renderPurchases(), loadPortfolioTargets()]);
+  await Promise.all([renderDashboard(), loadWines(), loadCellarLog(), loadTastingNotes(), loadPortfolioTargets()]);
 }
 
 function wireEvents() {
@@ -459,8 +460,9 @@ function wireEvents() {
   $("#filter-category").addEventListener("change", renderInventory);
   $("#filter-tasting-event").addEventListener("change", renderInventory);
   $("#inventory-sort").addEventListener("change", renderInventory);
-  $("#purchase-search").addEventListener("input", renderPurchaseTable);
-  $("#history-search").addEventListener("input", renderHistory);
+  $("#cellar-log-search").addEventListener("input", renderCellarLog);
+  $("#cellar-log-type").addEventListener("change", renderCellarLog);
+  $("#tasting-note-search").addEventListener("input", renderTastingNotes);
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
