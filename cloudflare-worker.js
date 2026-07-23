@@ -35,7 +35,8 @@ const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS bottles (
     id INTEGER PRIMARY KEY AUTOINCREMENT, bottle_code TEXT UNIQUE,
     wine_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'in_stock',
-    location_text TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    location_text TEXT, consumed_at TEXT, tasting_score REAL, tasting_notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`,
   `CREATE TABLE IF NOT EXISTS tasting_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, event_date TEXT NOT NULL,
@@ -63,7 +64,10 @@ const SCHEMA_UPDATES = [
   "ALTER TABLE wines ADD COLUMN storage_slot INTEGER",
   "ALTER TABLE wines ADD COLUMN current_market_price_sgd REAL",
   "ALTER TABLE wines ADD COLUMN storage_positions TEXT",
-  "ALTER TABLE tasting_event_wines ADD COLUMN bottle_code TEXT"
+  "ALTER TABLE tasting_event_wines ADD COLUMN bottle_code TEXT",
+  "ALTER TABLE bottles ADD COLUMN consumed_at TEXT",
+  "ALTER TABLE bottles ADD COLUMN tasting_score REAL",
+  "ALTER TABLE bottles ADD COLUMN tasting_notes TEXT"
 ];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
@@ -119,7 +123,7 @@ async function ensureBottleRecords(env) {
 
 async function winesWithBottles(env) {
   const wines = (await env.DB.prepare("SELECT * FROM wines ORDER BY producer, wine_name, vintage DESC").all()).results.map(wineFromRow);
-  const bottles = (await env.DB.prepare("SELECT wine_id, bottle_code, status, location_text FROM bottles ORDER BY id").all()).results;
+  const bottles = (await env.DB.prepare("SELECT wine_id, bottle_code, status, location_text, consumed_at, tasting_score, tasting_notes FROM bottles ORDER BY id").all()).results;
   const bottleMap = new Map();
   for (const bottle of bottles) {
     const list = bottleMap.get(bottle.wine_id) || [];
@@ -260,6 +264,43 @@ async function api(request, env, pathname) {
   if (pathname === "/api/bottles" && request.method === "GET") {
     return json((await env.DB.prepare("SELECT bottles.*, wines.producer, wines.wine_name, wines.vintage FROM bottles JOIN wines ON wines.id = bottles.wine_id ORDER BY bottles.id").all()).results);
   }
+  if (pathname === "/api/history" && request.method === "GET") {
+    return json((await env.DB.prepare(`
+      SELECT bottles.bottle_code, bottles.consumed_at, bottles.tasting_score, bottles.tasting_notes,
+        wines.id AS wine_id, wines.producer, wines.wine_name, wines.vintage, wines.appellation,
+        wines.color, wines.personal_score
+      FROM bottles JOIN wines ON wines.id = bottles.wine_id
+      WHERE bottles.status = 'consumed'
+      ORDER BY bottles.consumed_at DESC, bottles.updated_at DESC, bottles.id DESC
+    `).all()).results);
+  }
+  const consumeMatch = pathname.match(/^\/api\/bottles\/(B-\d+)\/consume$/);
+  if (consumeMatch && request.method === "POST") {
+    const bottle = await env.DB.prepare("SELECT * FROM bottles WHERE bottle_code = ?").bind(consumeMatch[1]).first();
+    if (!bottle) return json({ error: "Bottle not found" }, 404);
+    const body = await requestBody(request);
+    const consumedAt = /^\d{4}-\d{2}-\d{2}$/.test(String(body.consumed_at || ""))
+      ? String(body.consumed_at)
+      : new Date().toISOString().slice(0, 10);
+    const score = body.tasting_score === null || body.tasting_score === undefined || body.tasting_score === ""
+      ? null
+      : Number(body.tasting_score);
+    const statements = [
+      env.DB.prepare(`UPDATE bottles
+        SET status = 'consumed', location_text = ?, consumed_at = ?, tasting_score = ?, tasting_notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE bottle_code = ?`)
+        .bind(`已饮用 · ${consumedAt}`, consumedAt, score, body.tasting_notes || null, consumeMatch[1])
+    ];
+    if (bottle.status === "in_stock") {
+      statements.push(env.DB.prepare(`UPDATE wines
+        SET current_inventory = MAX(0, current_inventory - 1), personal_score = COALESCE(?, personal_score), updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`).bind(score, bottle.wine_id));
+    } else if (score !== null) {
+      statements.push(env.DB.prepare("UPDATE wines SET personal_score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(score, bottle.wine_id));
+    }
+    await env.DB.batch(statements);
+    return json(await env.DB.prepare("SELECT * FROM bottles WHERE bottle_code = ?").bind(consumeMatch[1]).first());
+  }
   const bottleMatch = pathname.match(/^\/api\/bottles\/(B-\d+)$/);
   if (bottleMatch && request.method === "DELETE") {
     const bottle = await env.DB.prepare(`
@@ -276,7 +317,7 @@ async function api(request, env, pathname) {
   }
   if (bottleMatch && request.method === "PATCH") {
     const body = await requestBody(request);
-    const entries = Object.entries(body).filter(([key]) => ["status", "location_text"].includes(key));
+    const entries = Object.entries(body).filter(([key]) => ["status", "location_text", "consumed_at", "tasting_score", "tasting_notes"].includes(key));
     if (!entries.length) return json({ error: "No editable fields supplied" }, 400);
     await env.DB.prepare(`UPDATE bottles SET ${entries.map(([key]) => `${key} = ?`).join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE bottle_code = ?`)
       .bind(...entries.map(([, value]) => value), bottleMatch[1]).run();

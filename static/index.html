@@ -16,6 +16,7 @@
         <button class="tab active" data-view="dashboard">Dashboard</button>
         <button class="tab" data-view="recommendations">Recommended</button>
         <button class="tab" data-view="inventory">Inventory</button>
+        <button class="tab" data-view="history">History</button>
         <button class="tab" data-view="purchases">Purchases</button>
       </nav>
     </header>
@@ -70,6 +71,20 @@
           </div>
           <div id="inventory-mobile-list" class="inventory-mobile-list"></div>
           <div id="inventory-table" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="history" class="view">
+        <div class="toolbar">
+          <h2>History</h2>
+          <div class="filters">
+            <input id="history-search" placeholder="搜索已喝酒款、生产者、年份" />
+          </div>
+        </div>
+        <div class="panel">
+          <h3>饮酒记录</h3>
+          <p class="hint">每一条对应一支已饮用的独立瓶号，保留当时的评分与品鉴笔记。</p>
+          <div id="history-table" class="table-wrap"></div>
         </div>
       </section>
 

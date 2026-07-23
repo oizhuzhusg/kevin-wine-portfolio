@@ -212,6 +212,8 @@ tr:hover td { background: #fafafa; }
 }
 .stock-delivered { background: #e6f3ea; color: #166534; }
 .stock-ordered { background: #fff3dc; color: #9a5800; }
+.score { color: var(--accent); white-space: nowrap; }
+.history-note { display: inline-block; min-width: 240px; max-width: 520px; line-height: 1.55; }
 .tasting-plan-tag {
   display: inline-flex;
   align-items: center;

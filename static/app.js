@@ -3,7 +3,8 @@ const state = {
   lookups: { categories: [], colors: [] },
   purchases: [],
   portfolioTargets: [],
-  tastingEvents: []
+  tastingEvents: [],
+  history: []
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -192,7 +193,8 @@ function renderInventory() {
   const rows = state.wines.filter(w => {
     const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
     const hasLocation = Boolean(w.storage_unit && w.storage_shelf);
-    return (!q || text.includes(q))
+    return (Number(w.current_inventory || 0) > 0 || Number(w.on_order_inventory || 0) > 0)
+      && (!q || text.includes(q))
       && (!cabinet || (cabinet === "unassigned" ? !hasLocation : w.storage_unit === cabinet))
       && (!color || w.color === color)
       && (!category || w.category_tags.includes(category))
@@ -220,7 +222,7 @@ function renderInventory() {
     { label: "Vintage", key: "vintage" },
     { label: "Use", render: r => r.category_tags.map(t => `<span class="tag">${t}</span>`).join("") },
     { label: "Profile", render: r => `<span class="hint">${escapeHtml(r.portfolio_role_reason || "")}<br>${escapeHtml(r.wine_introduction || "")}</span>` },
-    { label: "Rating", render: r => starRating(r.id, r.personal_score) },
+    { label: "Rating", render: r => scoreDisplay(r.personal_score) },
     { label: "瓶号", render: r => bottleCodes(r) },
     { label: "Status", render: r => inventoryStatus(r) },
     { label: "Location", render: r => storageLocation(r) },
@@ -233,17 +235,6 @@ function renderInventory() {
     { label: "最高可接受价", render: r => money(r.max_price_sgd) }
   ], rows);
   renderMobileInventory(rows);
-  $$(".star").forEach(button => {
-    button.addEventListener("click", async () => {
-      await api(`/api/wines/${button.dataset.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personal_score: Number.parseInt(button.dataset.value, 10) })
-      });
-      toast("评分已更新");
-      await refreshAll();
-    });
-  });
 }
 
 function tastingEventLabel(wineId) {
@@ -280,7 +271,7 @@ function renderMobileInventory(rows) {
           <div class="mobile-detail-row"><span>状态 / 目标</span><span>${inventoryStatus(wine)} / ${wine.target_inventory || 0}</span></div>
           <div class="mobile-detail-row"><span>酒柜位置</span><strong>${storageLocation(wine)}</strong></div>
           <div class="mobile-detail-row"><span>独立编号</span><strong>${bottleCodes(wine)}</strong></div>
-          <div class="mobile-detail-row"><span>评分</span>${starRating(wine.id, wine.personal_score)}</div>
+          <div class="mobile-detail-row"><span>评分</span>${scoreDisplay(wine.personal_score)}</div>
           <div class="mobile-detail-block"><span>酒款定位</span><p>${escapeHtml(wine.portfolio_role_reason || "-")}</p></div>
           <div class="mobile-detail-block"><span>酒款介绍</span><p>${escapeHtml(wine.wine_introduction || "-")}</p></div>
           <div class="mobile-detail-block"><span>现在怎么喝</span><p>${escapeHtml(wine.current_drinking_advice || "-")}</p></div>
@@ -294,13 +285,9 @@ function renderMobileInventory(rows) {
   }).join("");
 }
 
-function starRating(wineId, score) {
-  const rating = Math.max(0, Math.min(5, Math.round(Number(score || 0))));
-  return `
-    <span class="star-rating" aria-label="${rating} of 5 stars">
-      ${[1, 2, 3, 4, 5].map(value => `<button class="star ${value <= rating ? "filled" : ""}" data-id="${wineId}" data-value="${value}" title="${value} 星" type="button">★</button>`).join("")}
-    </span>
-  `;
+function scoreDisplay(score) {
+  if (score === null || score === undefined || score === "") return '<span class="hint">未评分</span>';
+  return `<strong class="score">${Number(score).toFixed(1)} / 10</strong>`;
 }
 
 function inventoryStatus(wine) {
@@ -342,6 +329,28 @@ function storageLocation(wine) {
 async function renderPurchases() {
   state.purchases = await api("/api/purchases");
   renderPurchaseTable();
+}
+
+async function loadHistory() {
+  state.history = await api("/api/history");
+  renderHistory();
+}
+
+function renderHistory() {
+  const query = normalize($("#history-search").value);
+  const rows = state.history.filter(record => {
+    const text = normalize(`${record.producer} ${record.wine_name} ${record.vintage} ${record.appellation} ${record.tasting_notes}`);
+    return !query || text.includes(query);
+  });
+  renderTable($("#history-table"), [
+    { label: "Date", render: r => eventDateLabel(r.consumed_at) || "-" },
+    { label: "Producer", key: "producer" },
+    { label: "Wine", render: r => `${escapeHtml(r.wine_name)}<br><span class="hint">${escapeHtml(r.appellation || "")}</span>` },
+    { label: "Vintage", key: "vintage" },
+    { label: "Bottle", render: r => `<span class="bottle-code">${escapeHtml(r.bottle_code)}</span>` },
+    { label: "Rating", render: r => scoreDisplay(r.tasting_score ?? r.personal_score) },
+    { label: "Tasting Note", render: r => `<span class="history-note">${escapeHtml(r.tasting_notes || "-")}</span>` }
+  ], rows);
 }
 
 function renderPurchaseTable() {
@@ -433,7 +442,7 @@ function normalize(value) {
 
 async function refreshAll() {
   await loadTastingEvents();
-  await Promise.all([renderDashboard(), loadWines(), renderPurchases(), loadPortfolioTargets()]);
+  await Promise.all([renderDashboard(), loadWines(), loadHistory(), renderPurchases(), loadPortfolioTargets()]);
 }
 
 function wireEvents() {
@@ -451,6 +460,7 @@ function wireEvents() {
   $("#filter-tasting-event").addEventListener("change", renderInventory);
   $("#inventory-sort").addEventListener("change", renderInventory);
   $("#purchase-search").addEventListener("input", renderPurchaseTable);
+  $("#history-search").addEventListener("input", renderHistory);
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
