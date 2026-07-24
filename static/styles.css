@@ -152,6 +152,26 @@ form { display: grid; gap: 12px; }
   line-height: 1.5;
 }
 .cabinet-layout strong, .storage-location { color: var(--ink); font-weight: 750; }
+.bottle-location-list {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+.bottle-location-item {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.bottle-location-item code {
+  color: #29485f;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 9px 8px; vertical-align: top; }
 th { color: var(--muted); font-size: 12px; white-space: nowrap; }
@@ -365,6 +385,8 @@ code { background: #eceff3; padding: 2px 4px; border-radius: 4px; }
   }
   .mobile-detail-row > span:first-child, .mobile-detail-block > span { color: var(--muted); font-size: 12px; font-weight: 700; }
   .mobile-detail-row .inline-inventory { width: 64px; padding: 6px 8px; }
+  .mobile-detail-row .bottle-location-list { width: 100%; min-width: 0; }
+  .mobile-detail-row:has(.bottle-location-list) { align-items: start; }
   .mobile-detail-block { border-bottom: 1px solid var(--line); padding: 10px 0; }
   .mobile-detail-block p { margin: 4px 0 0; color: var(--ink); font-size: 13px; line-height: 1.55; }
   table, tbody, tr, td { display: block; width: 100%; }
