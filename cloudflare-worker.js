@@ -300,6 +300,25 @@ async function api(request, env, pathname) {
       ) ORDER BY event_date DESC, created_at DESC
     `).all()).results);
   }
+  if (pathname === "/api/cellar-events" && request.method === "POST") {
+    const body = await requestBody(request);
+    const eventType = String(body.event_type || "").trim();
+    const wineId = Number(body.wine_id);
+    const quantity = Number(body.quantity || 1);
+    const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.event_date || ""))
+      ? String(body.event_date)
+      : new Date().toISOString().slice(0, 10);
+    if (!wineId || !["purchased", "received", "moved", "consumed"].includes(eventType) || quantity < 1) {
+      return json({ error: "A valid wine_id, event_type and quantity are required" }, 400);
+    }
+    const wine = await env.DB.prepare("SELECT id FROM wines WHERE id = ?").bind(wineId).first();
+    if (!wine) return json({ error: "Wine not found" }, 404);
+    const result = await env.DB.prepare(`INSERT INTO cellar_events
+      (event_date, event_type, wine_id, bottle_code, quantity, details)
+      VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(eventDate, eventType, wineId, body.bottle_code || null, quantity, body.details || null).run();
+    return json(await env.DB.prepare("SELECT * FROM cellar_events WHERE id = ?").bind(result.meta.last_row_id).first(), 201);
+  }
   if (pathname === "/api/tasting-notes" && request.method === "GET") {
     return json((await env.DB.prepare(`
       SELECT * FROM tasting_notes
@@ -447,7 +466,25 @@ async function api(request, env, pathname) {
     values[0] ||= "Unknown"; values[1] ||= "Unnamed wine"; values[8] ||= "red";
     const result = await env.DB.prepare(`INSERT INTO wines (${fields.join(",")}, category_tags, style_tags) VALUES (${fields.map(() => "?").join(",")}, ?, ?)`)
       .bind(...values, JSON.stringify(body.category_tags || ["Discovery"]), JSON.stringify(body.style_tags || [])).run();
-    return json(wineFromRow(await env.DB.prepare("SELECT * FROM wines WHERE id = ?").bind(result.meta.last_row_id).first()), 201);
+    const wineId = result.meta.last_row_id;
+    const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.event_date || ""))
+      ? String(body.event_date)
+      : new Date().toISOString().slice(0, 10);
+    const currentInventory = Number(body.current_inventory || 0);
+    const onOrderInventory = Number(body.on_order_inventory || 0);
+    const cellarEvents = [];
+    if (onOrderInventory > 0) {
+      cellarEvents.push(env.DB.prepare(`INSERT INTO cellar_events
+        (event_date, event_type, wine_id, quantity, details) VALUES (?, 'purchased', ?, ?, ?)`)
+        .bind(eventDate, wineId, onOrderInventory, body.purchase_details || "下单 / 运输中"));
+    }
+    if (currentInventory > 0) {
+      cellarEvents.push(env.DB.prepare(`INSERT INTO cellar_events
+        (event_date, event_type, wine_id, quantity, details) VALUES (?, 'received', ?, ?, ?)`)
+        .bind(eventDate, wineId, currentInventory, body.received_details || "新酒入库"));
+    }
+    if (cellarEvents.length) await env.DB.batch(cellarEvents);
+    return json(wineFromRow(await env.DB.prepare("SELECT * FROM wines WHERE id = ?").bind(wineId).first()), 201);
   }
   const wineMatch = pathname.match(/^\/api\/wines\/(\d+)$/);
   if (wineMatch && request.method === "PATCH") {
