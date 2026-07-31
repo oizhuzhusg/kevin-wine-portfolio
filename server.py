@@ -49,6 +49,7 @@ PORTFOLIO_TARGETS = [
     ("Domaine Sylvie Esmonin", "Gevrey-Chambertin", "Burgundy", "red", "2009, 2014-2017, 2019", "2021", 140, 215, "Discovery", "Ready", "Wishlist", None, None, "更有力量与成熟感的 Gevrey。"),
     ("Ghislaine Barthod", "Chambolle-Musigny", "Burgundy", "red", "2015-2019, 2022", "2021", 180, 260, "Discovery", "Ready", "Tasted", 7.5, "maybe", "红果，花香不明显；偏酸，整体平衡但比较平淡，余味不长。当前排在 Denis Mortet Mes Cinq Terroirs 2023 之后；不考虑买整箱。"),
     ("Comte Armand", "Pommard 1er Cru Clos des Epeneaux", "Burgundy", "red", "2009, 2016, 2018-2020", "2021", 250, 340, "Heritage", "Ready", "Wishlist", None, None, "成熟年份优先，用来认识 Pommard。"),
+    ("Domaine Henri Magnien", "Gevrey-Chambertin 1er Cru Les Cazetiers", "Burgundy", "red", "2015-2019", "2021", 180, 260, "Discovery", "Ready", "Wishlist", None, None, "尚未购买或品鉴；以更传统、但仍有果味和结构的 Cazetiers，补充 Gevrey 的下一条探索线。"),
     ("Marquis d'Angerville", "Volnay 1er Cru Taillepieds", "Burgundy", "red", "2009, 2016, 2018-2020", "2021", 260, 340, "Heritage", "Ready", "Wishlist", None, None, "成熟 Volnay 的标杆性对照。"),
     ("Hubert Lamy", "Saint-Aubin 1er Cru En Remilly", "Burgundy", "white", "2010, 2021-2023", "", 180, 250, "Discovery", "Ready", "Tasted", None, None, "2010 第一印象：酸度偏高。保留为生产者、地块与年份的独立记录。"),
     ("Hubert Lamy", "Saint-Aubin Village / Les Frionnes", "Burgundy", "white", "2020, 2022-2023", "", 160, 230, "Discovery", "Ready", "Wishlist", None, None, "用较有果味和中段的酒款重新验证 Lamy。"),
@@ -253,6 +254,8 @@ REGION_COUNTRIES = {
 RETIRED_TARGETS = [
     ("Domaine Leflaive", "Bourgogne Blanc / Puligny-Montrachet"),
     ("François Carillon", "Puligny-Montrachet"),
+    ("Domaine Bruno Clair", "Gevrey-Chambertin 1er Cru Clos du Fonteny"),
+    ("Domaine de Courcel", "Pommard 1er Cru Les Grands Epenots"),
 ]
 
 

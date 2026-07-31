@@ -3,6 +3,10 @@ import seedTargets from "./seed-targets.json";
 const CATEGORIES = ["Drink Now", "Cellar", "Business", "Discovery"];
 const COLORS = ["red", "white", "sparkling", "sweet", "fortified"];
 const FULFILLMENT_STATUSES = ["ordered", "delivered"];
+const RETIRED_TARGETS = [
+  ["Domaine Bruno Clair", "Gevrey-Chambertin 1er Cru Clos du Fonteny"],
+  ["Domaine de Courcel", "Pommard 1er Cru Les Grands Epenots"]
+];
 let seedPromise;
 let schemaPromise;
 
@@ -159,6 +163,9 @@ async function ensureSchema(env) {
 async function ensureTargets(env) {
   if (!seedPromise) {
     seedPromise = (async () => {
+      for (const [producer, wineName] of RETIRED_TARGETS) {
+        await env.DB.prepare("DELETE FROM portfolio_targets WHERE producer = ? AND wine_name = ?").bind(producer, wineName).run();
+      }
       const sql = `INSERT OR IGNORE INTO portfolio_targets
         (producer, wine_name, region, country, color, recommended_vintages, avoid_vintages, ideal_price_sgd, max_price_sgd, role, stage, status, personal_score, would_buy_again, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;

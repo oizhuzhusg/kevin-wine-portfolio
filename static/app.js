@@ -361,6 +361,7 @@ const tastingSourceLabel = source => ({ home: "家里开瓶", external: "外出�
 async function loadTastingNotes() {
   state.tastingNotes = await api("/api/tasting-notes");
   renderTastingNotes();
+  if (state.portfolioTargets.length) renderPortfolioTargets();
 }
 
 function renderTastingNotes() {
@@ -394,18 +395,22 @@ function targetStatusLabel(status) {
   return { Wishlist: "待尝试", Purchased: "已购买", Tasted: "已喝", Approved: "会回购", Archived: "不再关注" }[status] || status;
 }
 
+function targetHasTastingNote(target) {
+  const producer = normalize(target.producer);
+  const wine = normalize(target.wine_name);
+  return state.tastingNotes.some(note => normalize(note.producer) === producer && normalize(note.wine_name) === wine);
+}
+
 function renderPortfolioTargets() {
   const query = normalize($("#recommendation-search").value);
   const region = $("#recommendation-region").value;
   const color = $("#recommendation-color").value;
-  const status = $("#recommendation-status").value;
-  const activeStatuses = ["Wishlist", "Purchased"];
-  const activeTargets = state.portfolioTargets.filter(target => activeStatuses.includes(target.status));
+  const activeTargets = state.portfolioTargets.filter(target => target.status === "Wishlist" && !targetHasTastingNote(target));
   const rows = activeTargets.filter(target => {
     const text = normalize(`${target.producer} ${target.wine_name} ${target.region} ${target.country}`);
-    return (!query || text.includes(query)) && (!region || target.region === region) && (!color || target.color === color) && (!status || target.status === status);
+    return (!query || text.includes(query)) && (!region || target.region === region) && (!color || target.color === color);
   });
-  $("#recommendation-summary").innerHTML = `<span>${activeTargets.length} 个待行动推荐</span><span>${new Set(activeTargets.map(target => target.region)).size} 个产区</span><span>已喝酒款请到 Tasting Notes 查看</span>`;
+  $("#recommendation-summary").innerHTML = `<span>${activeTargets.length} 个待购买推荐</span><span>${new Set(activeTargets.map(target => target.region)).size} 个产区</span><span>已购酒看 Inventory；已喝酒看 Tasting Notes</span>`;
   renderTable($("#recommendation-table"), [
     { label: "Producer", key: "producer" },
     { label: "Wine", render: target => `${target.wine_name}<br><span class="hint">${target.region || ""}</span>` },
@@ -443,7 +448,9 @@ function normalize(value) {
 
 async function refreshAll() {
   await loadTastingEvents();
-  await Promise.all([renderDashboard(), loadWines(), loadCellarLog(), loadTastingNotes(), loadPortfolioTargets()]);
+  await Promise.all([renderDashboard(), loadWines(), loadCellarLog()]);
+  await loadTastingNotes();
+  await loadPortfolioTargets();
 }
 
 function wireEvents() {
@@ -466,7 +473,6 @@ function wireEvents() {
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
-  $("#recommendation-status").addEventListener("change", renderPortfolioTargets);
 
 }
 
