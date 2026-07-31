@@ -399,13 +399,13 @@ function renderPortfolioTargets() {
   const region = $("#recommendation-region").value;
   const color = $("#recommendation-color").value;
   const status = $("#recommendation-status").value;
-  const rows = state.portfolioTargets.filter(target => {
+  const activeStatuses = ["Wishlist", "Purchased"];
+  const activeTargets = state.portfolioTargets.filter(target => activeStatuses.includes(target.status));
+  const rows = activeTargets.filter(target => {
     const text = normalize(`${target.producer} ${target.wine_name} ${target.region} ${target.country}`);
     return (!query || text.includes(query)) && (!region || target.region === region) && (!color || target.color === color) && (!status || target.status === status);
   });
-  const tasted = state.portfolioTargets.filter(target => target.status === "Tasted").length;
-  const approved = state.portfolioTargets.filter(target => target.status === "Approved").length;
-  $("#recommendation-summary").innerHTML = `<span>${state.portfolioTargets.length} 推荐</span><span>${new Set(state.portfolioTargets.map(target => target.region)).size} 个产区</span><span>${tasted} 已喝</span><span>${approved} 会回购</span>`;
+  $("#recommendation-summary").innerHTML = `<span>${activeTargets.length} 个待行动推荐</span><span>${new Set(activeTargets.map(target => target.region)).size} 个产区</span><span>已喝酒款请到 Tasting Notes 查看</span>`;
   renderTable($("#recommendation-table"), [
     { label: "Producer", key: "producer" },
     { label: "Wine", render: target => `${target.wine_name}<br><span class="hint">${target.region || ""}</span>` },

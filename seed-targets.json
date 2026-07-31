@@ -476,6 +476,23 @@
     "notes": "Gevrey 的果味与完成度坐标。"
   },
   {
+    "producer": "Domaine Bruno Clair",
+    "wine_name": "Gevrey-Chambertin 1er Cru Clos du Fonteny",
+    "region": "Burgundy",
+    "country": "France",
+    "color": "red",
+    "recommended_vintages": "2015-2019",
+    "avoid_vintages": "2021",
+    "ideal_price_sgd": 240.0,
+    "max_price_sgd": 340.0,
+    "role": "Discovery",
+    "stage": "Ready",
+    "status": "Wishlist",
+    "personal_score": null,
+    "would_buy_again": null,
+    "notes": "已验证风格方向；果味、平衡与结构贴合当前偏好，遇到合适年份可优先单瓶补试。"
+  },
+  {
     "producer": "Comte Armand",
     "wine_name": "Pommard 1er Cru Clos des Epeneaux",
     "region": "Burgundy",
@@ -559,6 +576,23 @@
     "personal_score": null,
     "would_buy_again": null,
     "notes": "测试纯净红果与细腻质地。"
+  },
+  {
+    "producer": "Domaine Duroché",
+    "wine_name": "Gevrey-Chambertin",
+    "region": "Burgundy",
+    "country": "France",
+    "color": "red",
+    "recommended_vintages": "2015-2020",
+    "avoid_vintages": "2021",
+    "ideal_price_sgd": 180.0,
+    "max_price_sgd": 260.0,
+    "role": "Discovery",
+    "stage": "Ready",
+    "status": "Wishlist",
+    "personal_score": null,
+    "would_buy_again": null,
+    "notes": "用纯净果味、细致但不失集中度的 Gevrey，继续校准你对结构与中段的偏好。"
   },
   {
     "producer": "Domaine Jean Grivot",
@@ -712,6 +746,23 @@
     "personal_score": null,
     "would_buy_again": null,
     "notes": "与 Mortet 对照的传统 Gevrey。"
+  },
+  {
+    "producer": "Domaine Taupenot-Merme",
+    "wine_name": "Charmes-Chambertin Grand Cru",
+    "region": "Burgundy",
+    "country": "France",
+    "color": "red",
+    "recommended_vintages": "2018-2020",
+    "avoid_vintages": "2021",
+    "ideal_price_sgd": 260.0,
+    "max_price_sgd": 300.0,
+    "role": "Discovery",
+    "stage": "Hold",
+    "status": "Wishlist",
+    "personal_score": null,
+    "would_buy_again": null,
+    "notes": "只建议单瓶探索；用更完整、带香料感的特级园表达，判断你是否喜欢 Taupenot-Merme 的纯净与结构。"
   },
   {
     "producer": "Ballot-Millot",

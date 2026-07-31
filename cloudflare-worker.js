@@ -159,8 +159,6 @@ async function ensureSchema(env) {
 async function ensureTargets(env) {
   if (!seedPromise) {
     seedPromise = (async () => {
-      const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM portfolio_targets").first();
-      if (existing.count) return;
       const sql = `INSERT OR IGNORE INTO portfolio_targets
         (producer, wine_name, region, country, color, recommended_vintages, avoid_vintages, ideal_price_sgd, max_price_sgd, role, stage, status, personal_score, would_buy_again, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
