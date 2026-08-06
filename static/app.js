@@ -192,10 +192,16 @@ function renderInventory() {
   const plannedWineIds = new Set(state.tastingEvents.flatMap(event => event.wines.map(wine => Number(wine.wine_id))));
   const rows = state.wines.filter(w => {
     const text = normalize(`${w.producer} ${w.wine_name} ${w.region} ${w.country} ${w.appellation}`);
-    const hasLocation = Boolean(w.storage_unit && w.storage_shelf);
+    const inStockBottles = (w.bottles || []).filter(bottle => bottle.status === "in_stock");
+    const hasUnassignedBottle = inStockBottles.some(bottle => !bottle.location_text);
+    const isInCabinet = cabinet => inStockBottles.some(bottle =>
+      String(bottle.location_text || "").startsWith(cabinet)
+    );
     return (Number(w.current_inventory || 0) > 0 || Number(w.on_order_inventory || 0) > 0)
       && (!q || text.includes(q))
-      && (!cabinet || (cabinet === "unassigned" ? !hasLocation : w.storage_unit === cabinet))
+      && (!cabinet || (cabinet === "unassigned"
+        ? hasUnassignedBottle
+        : isInCabinet(cabinet)))
       && (!color || w.color === color)
       && (!category || w.category_tags.includes(category))
       && (!tastingEvent || (tastingEvent === "planned"
