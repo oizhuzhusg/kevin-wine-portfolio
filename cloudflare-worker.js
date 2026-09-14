@@ -110,12 +110,31 @@ async function publicWineries(request, url) {
 
   const [south, west, north, east] = bbox;
   const query = `[out:json][timeout:20];(node["craft"="winery"](${south},${west},${north},${east});way["craft"="winery"](${south},${west},${north},${east});relation["craft"="winery"](${south},${west},${north},${east}););out center tags;`;
-  const response = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-    body: new URLSearchParams({ data: query }).toString()
-  });
-  if (!response.ok) return json({ error: "Public winery data is temporarily unavailable" }, 502);
+  const endpoints = [
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
+    "https://overpass-api.de/api/interpreter"
+  ];
+  let response;
+  for (const endpoint of endpoints) {
+    try {
+      const candidate = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "User-Agent": "KevinWinePortfolio/1.0 (personal wine map)"
+        },
+        body: new URLSearchParams({ data: query }).toString()
+      });
+      if (candidate.ok) {
+        response = candidate;
+        break;
+      }
+    } catch {
+      // Try the next public mirror without exposing infrastructure details to the visitor.
+    }
+  }
+  if (!response) return json({ error: "Public winery data is temporarily unavailable" }, 502);
   const payload = await response.json();
   const wineries = (payload.elements || [])
     .map(element => ({
