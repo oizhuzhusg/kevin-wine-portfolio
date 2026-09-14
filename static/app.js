@@ -506,7 +506,12 @@ const MAP_REGION_CENTERS = [
 
 function mapCountryFor(wine) {
   const known = String(wine.country || "").trim();
-  if (MAP_COUNTRIES[known]) return known;
+  const suppliedCountry = normalize(known);
+  if (/^(usa|united states|u s a|u s)$/.test(suppliedCountry)) return "USA";
+  if (/^(new zealand|nz)$/.test(suppliedCountry)) return "New Zealand";
+  if (/^(south africa|rsa)$/.test(suppliedCountry)) return "South Africa";
+  const canonicalCountry = Object.keys(MAP_COUNTRIES).find(country => normalize(country) === suppliedCountry);
+  if (canonicalCountry) return canonicalCountry;
   const text = normalize(`${wine.country} ${wine.region} ${wine.appellation} ${wine.producer} ${wine.wine_name}`);
   if (/burgundy|gevrey|morey|chambolle|vosne|nuits|pommard|volnay|meursault|beaune|bordeaux|pauillac|saint emilion|pessac|rhone|chateauneuf|alsace/.test(text)) return "France";
   if (/tuscany|brunello|veneto|amarone|sangiovese|montevertine/.test(text)) return "Italy";
