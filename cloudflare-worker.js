@@ -123,8 +123,28 @@ function geometryCenter(geometry) {
   return { lat: lat / points.length, lng: lng / points.length };
 }
 
+function geometryBounds(geometry) {
+  if (!geometry?.coordinates) return null;
+  const points = [];
+  const collect = value => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") points.push(value);
+    else value.forEach(collect);
+  };
+  collect(geometry.coordinates);
+  if (!points.length) return null;
+  return points.reduce((bounds, [lng, lat]) => ({
+    south: Math.min(bounds.south, lat), west: Math.min(bounds.west, lng),
+    north: Math.max(bounds.north, lat), east: Math.max(bounds.east, lng)
+  }), { south: Infinity, west: Infinity, north: -Infinity, east: -Infinity });
+}
+
+function intersectsBounds(bounds, south, west, north, east) {
+  return bounds && bounds.north >= south && bounds.south <= north && bounds.east >= west && bounds.west <= east;
+}
+
 async function countryWineryData(url, countryCode) {
-  const cacheKey = new Request(`${url.origin}/api/world-wineries/cache/${countryCode}`);
+  const cacheKey = new Request(`${url.origin}/api/world-wineries/cache/v2/${countryCode}`);
   const cached = await caches.default.match(cacheKey);
   if (cached) return cached.json();
 
@@ -146,7 +166,21 @@ async function countryWineryData(url, countryCode) {
       };
     })
     .filter(Boolean);
-  const result = { wineries, source: "Open Wine Map / OpenStreetMap" };
+  const vineyards = (payload.features || [])
+    .filter(feature => feature.properties?.category === "vineyard" && ["Polygon", "MultiPolygon"].includes(feature.geometry?.type))
+    .map(feature => {
+      const tags = feature.properties?.tags || {};
+      return {
+        id: `${feature.properties?.osm_type || "way"}/${feature.properties?.osm_id || feature.id || ""}`,
+        name: feature.properties?.name || tags.name || "Unnamed vineyard",
+        geometry: feature.geometry,
+        bounds: geometryBounds(feature.geometry),
+        website: tags.website || null,
+        wikidata: tags.wikidata || null
+      };
+    })
+    .filter(vineyard => vineyard.bounds);
+  const result = { wineries, vineyards, source: "Open Wine Map / OpenStreetMap" };
   const cachedResponse = json(result);
   cachedResponse.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
   await caches.default.put(cacheKey, cachedResponse.clone());
@@ -164,7 +198,10 @@ async function publicWineries(request, url) {
     const wineries = countryData.wineries
       .filter(winery => winery.lat >= south && winery.lat <= north && winery.lng >= west && winery.lng <= east)
       .slice(0, 1000);
-    const result = json({ wineries, source: countryData.source, cached_for_seconds: WORLD_WINERY_CACHE_SECONDS });
+    const vineyards = countryData.vineyards
+      .filter(vineyard => intersectsBounds(vineyard.bounds, south, west, north, east))
+      .slice(0, 400);
+    const result = json({ wineries, vineyards, source: countryData.source, cached_for_seconds: WORLD_WINERY_CACHE_SECONDS });
     result.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
     return result;
   } catch {

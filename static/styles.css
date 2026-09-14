@@ -308,6 +308,7 @@ tr:hover td { background: #fafafa; }
 .legend-dot.region { background: var(--gold); }
 .legend-dot.producer { background: var(--accent); }
 .legend-dot.public { background: #496377; }
+.legend-dot.vineyard { background: #c39236; }
 .map-toggle {
   display: inline-flex;
   grid-auto-flow: column;
@@ -337,12 +338,13 @@ tr:hover td { background: #fafafa; }
 .map-bubble.region { background: var(--gold); }
 .map-bubble.producer { background: var(--accent); }
 .public-winery-marker {
-  width: 11px;
-  height: 11px;
+  display: block;
+  width: 15px;
+  height: 15px;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: #496377;
-  box-shadow: 0 1px 5px rgba(32, 33, 36, 0.26);
+  background: #29485f;
+  box-shadow: 0 1px 5px rgba(32, 33, 36, 0.36), inset 0 0 0 3px #c39236;
 }
 .map-details { padding: 18px; }
 .map-details-empty { color: var(--muted); line-height: 1.6; }
