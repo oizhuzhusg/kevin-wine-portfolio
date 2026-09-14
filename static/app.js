@@ -551,12 +551,12 @@ function mapOffset(record) {
   return [((hash % 17) - 8) * 0.007, (((hash / 17) % 17) - 8) * 0.01];
 }
 
-function mapBubbleIcon(value, type) {
+function mapBubbleIcon(value, type, label = false) {
   return L.divIcon({
     className: "",
-    html: `<span class="map-bubble ${type}">${value}</span>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18]
+    html: `<span class="map-bubble ${type}${label ? " label" : ""}">${escapeHtml(value)}</span>`,
+    iconSize: label ? [120, 30] : [36, 36],
+    iconAnchor: label ? [60, 15] : [18, 18]
   });
 }
 
@@ -604,7 +604,7 @@ function filteredMapRecords() {
 function renderMapDetails(record) {
   const container = $("#wine-map-details");
   if (!record) {
-    container.innerHTML = `<div class="map-details-empty"><h3>从一杯酒找到一个地方</h3><p>缩放地图：世界视图显示国家和产区；继续放大，可加载地图范围内的公开酒庄。</p><p>酒红色点位是你的酒窖与品鉴足迹，蓝灰色点位来自 OpenStreetMap 的公开酒庄资料。</p></div>`;
+    container.innerHTML = `<div class="map-details-empty"><h3>从一杯酒找到一个地方</h3><p>从国家进入产区，再放大查看酒庄；继续深入才会显示公开葡萄园地块。</p><p>酒红色点位是你的酒窖与品鉴足迹，深蓝点位与金色边界来自公开地图资料。</p></div>`;
     return;
   }
   const noteScores = record.notes.map(note => note.score).filter(score => score !== null && score !== undefined);
@@ -709,7 +709,7 @@ function publicWineryBounds() {
 
 async function loadPublicWineries() {
   const { map } = state.wineMap;
-  if (!map || map.getZoom() < 8 || !$("#wine-map-all-wineries")?.checked) return;
+  if (!map || map.getZoom() < 11 || !$("#wine-map-all-wineries")?.checked) return;
   const country = $("#wine-map-country").value;
   const countryCode = PUBLIC_WINE_COUNTRY_CODES[country];
   if (!countryCode) return;
@@ -742,18 +742,19 @@ function schedulePublicWineryLoad() {
 function renderWineMapSummary(records = filteredMapRecords()) {
   const publicCount = state.wineMap.publicWineries.length;
   const vineyardCount = state.wineMap.publicVineyards.length;
-  const publicText = publicCount
-    ? ` · 当前范围 ${publicCount} 家公开酒庄${vineyardCount ? ` · ${vineyardCount} 块葡萄园地块` : ""}`
-    : $("#wine-map-country").value ? " · 放大地图加载公开酒庄" : " · 选择国家后加载公开酒庄";
+  const zoom = state.wineMap.map?.getZoom() || 2;
+  const publicText = publicCount && zoom >= 12
+    ? ` · ${publicCount} 家公开酒庄${vineyardCount && zoom >= 14 ? ` · ${vineyardCount} 块葡萄园地块` : ""}`
+    : $("#wine-map-country").value ? " · 放大至酒庄层探索" : " · 选择国家后开始探索";
   $("#wine-map-summary").textContent = `我的 ${records.length} 家酒庄 · ${new Set(records.map(record => record.region)).size} 个产区${publicText}`;
 }
 
 function ensureWineMap() {
   if (state.wineMap.map || !window.L) return;
   const map = L.map("wine-world-map", { scrollWheelZoom: true, minZoom: 2 }).setView([25, 8], 2);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 18,
-    attribution: "&copy; OpenStreetMap contributors"
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
   }).addTo(map);
   state.wineMap.map = map;
   state.wineMap.layers = { country: L.layerGroup(), region: L.layerGroup(), producer: L.layerGroup(), public: L.layerGroup(), vineyard: L.layerGroup() };
@@ -768,10 +769,10 @@ function updateWineMapLayerVisibility() {
   Object.values(layers).forEach(layer => map.removeLayer(layer));
   const zoom = map.getZoom();
   if (zoom < 4) layers.country.addTo(map);
-  else if (zoom < 7) layers.region.addTo(map);
+  else if (zoom < 11) layers.region.addTo(map);
   else {
-    if ($("#wine-map-vineyards")?.checked) layers.vineyard.addTo(map);
-    if ($("#wine-map-all-wineries")?.checked) layers.public.addTo(map);
+    if (zoom >= 14 && $("#wine-map-vineyards")?.checked) layers.vineyard.addTo(map);
+    if (zoom >= 12 && $("#wine-map-all-wineries")?.checked) layers.public.addTo(map);
     layers.producer.addTo(map);
   }
 }
@@ -796,7 +797,7 @@ function rebuildWineMapLayers(records) {
   });
   countryGroups.forEach((group, country) => {
     const coords = MAP_COUNTRIES[country] || [group[0].lat, group[0].lng];
-    L.marker(coords, { icon: mapBubbleIcon(group.length, "country") })
+    L.marker(coords, { icon: mapBubbleIcon(`${country} · ${group.length}`, "country", true) })
       .bindTooltip(`${escapeHtml(country)} · ${group.length} 家酒庄`, { direction: "top" })
       .on("click", () => {
         $("#wine-map-country").value = country;
@@ -807,9 +808,9 @@ function rebuildWineMapLayers(records) {
   });
   regionGroups.forEach(group => {
     const first = group[0];
-    L.marker([first.lat, first.lng], { icon: mapBubbleIcon(group.length, "region") })
+    L.marker([first.lat, first.lng], { icon: mapBubbleIcon(`${first.region} · ${group.length}`, "region", true) })
       .bindTooltip(`${escapeHtml(first.region)} · ${group.length} 家酒庄`, { direction: "top" })
-      .on("click", () => map.flyTo([first.lat, first.lng], 8, { duration: 0.6 }))
+      .on("click", () => map.flyTo([first.lat, first.lng], 11, { duration: 0.6 }))
       .addTo(layers.region);
   });
   renderPublicVineyardLayer();

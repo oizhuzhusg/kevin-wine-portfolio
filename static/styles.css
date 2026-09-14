@@ -337,6 +337,15 @@ tr:hover td { background: #fafafa; }
 .map-bubble.country { background: #29485f; }
 .map-bubble.region { background: var(--gold); }
 .map-bubble.producer { background: var(--accent); }
+.map-bubble.label {
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
 .public-winery-marker {
   display: block;
   width: 15px;
