@@ -4,7 +4,8 @@ const state = {
   portfolioTargets: [],
   tastingEvents: [],
   cellarLog: [],
-  tastingNotes: []
+  tastingNotes: [],
+  wineMap: { map: null, layers: null, records: [] }
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -90,6 +91,7 @@ async function loadLookups() {
 async function loadWines() {
   state.wines = await api("/api/wines");
   renderInventory();
+  renderWineMap();
 }
 
 async function loadTastingEvents() {
@@ -367,6 +369,7 @@ const tastingSourceLabel = source => ({ home: "家里开瓶", external: "外出�
 async function loadTastingNotes() {
   state.tastingNotes = await api("/api/tasting-notes");
   renderTastingNotes();
+  renderWineMap();
   if (state.portfolioTargets.length) renderPortfolioTargets();
 }
 
@@ -452,6 +455,248 @@ function normalize(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ").trim();
 }
 
+const MAP_COUNTRIES = {
+  France: [46.68, 2.55], Italy: [42.83, 12.83], Spain: [40.32, -3.72],
+  USA: [38.65, -98.32], "New Zealand": [-41.18, 174.55], Australia: [-25.27, 133.78],
+  Argentina: [-38.42, -63.62], "South Africa": [-30.56, 22.94], Germany: [51.17, 10.45],
+  Portugal: [39.4, -8.22], Romania: [45.94, 24.97], Chile: [-35.68, -71.54],
+  Austria: [47.52, 14.55], Hungary: [47.16, 19.5], Greece: [39.07, 21.82]
+};
+
+const MAP_REGION_CENTERS = [
+  ["gevrey-chambertin", "热夫雷-香贝丹", 47.226, 4.973, "Burgundy"],
+  ["morey-saint-denis", "莫雷-圣但尼", 47.202, 4.985, "Burgundy"],
+  ["chambolle-musigny", "香波-慕西尼", 47.19, 4.949, "Burgundy"],
+  ["vosne-romanee", "沃恩-罗曼尼", 47.16, 4.955, "Burgundy"],
+  ["nuits-saint-georges", "夜圣乔治", 47.137, 4.95, "Burgundy"],
+  ["pommard", "波玛", 46.93, 4.79, "Burgundy"],
+  ["volnay", "沃尔奈", 46.95, 4.78, "Burgundy"],
+  ["meursault", "默尔索", 46.98, 4.77, "Burgundy"],
+  ["beaune", "博恩", 47.02, 4.84, "Burgundy"],
+  ["burgundy", "勃艮第", 47.15, 4.85, "Burgundy"],
+  ["saint-emilion", "圣埃美隆", 44.89, -0.16, "Bordeaux"],
+  ["pessac", "佩萨克", 44.78, -0.68, "Bordeaux"],
+  ["pauillac", "波亚克", 45.2, -0.77, "Bordeaux"],
+  ["bordeaux", "波尔多", 44.84, -0.58, "Bordeaux"],
+  ["rhone", "罗讷", 45.07, 4.83, "Rhone"],
+  ["saint-joseph", "圣约瑟夫", 45.12, 4.76, "Rhone"],
+  ["chateauneuf", "教皇新堡", 44.06, 4.83, "Rhone"],
+  ["tuscany", "托斯卡纳", 43.39, 11.16, "Tuscany"],
+  ["brunello", "蒙塔奇诺", 43.06, 11.49, "Tuscany"],
+  ["veneto", "威尼托", 45.44, 11.01, "Veneto"],
+  ["rioja", "里奥哈", 42.46, -2.45, "Rioja"],
+  ["ribera", "杜埃罗河岸", 41.63, -3.69, "Ribera del Duero"],
+  ["napa", "纳帕谷", 38.5, -122.27, "California"],
+  ["sonoma", "索诺玛", 38.44, -122.71, "California"],
+  ["california", "加州", 37.25, -119.75, "California"],
+  ["waiheke", "怀赫科岛", -36.8, 175.1, "New Zealand"],
+  ["hawke", "霍克斯湾", -39.62, 176.82, "New Zealand"],
+  ["marlborough", "马尔堡", -41.51, 173.96, "New Zealand"],
+  ["new zealand", "新西兰", -41.18, 174.55, "New Zealand"],
+  ["barossa", "巴罗萨谷", -34.5, 139.05, "Australia"],
+  ["margaret river", "玛格丽特河", -33.95, 115.07, "Australia"],
+  ["australia", "澳大利亚", -25.27, 133.78, "Australia"],
+  ["mendoza", "门多萨", -33.0, -69.18, "Argentina"],
+  ["mosel", "摩泽尔", 49.91, 6.94, "Germany"],
+  ["alsace", "阿尔萨斯", 48.25, 7.35, "France"],
+  ["dao", "道河", 40.42, -7.93, "Portugal"],
+  ["transylvania", "特兰西瓦尼亚", 46.77, 24.7, "Romania"],
+  ["stellenbosch", "斯泰伦博斯", -33.93, 18.86, "South Africa"]
+];
+
+function mapCountryFor(wine) {
+  const known = String(wine.country || "").trim();
+  if (MAP_COUNTRIES[known]) return known;
+  const text = normalize(`${wine.country} ${wine.region} ${wine.appellation} ${wine.producer} ${wine.wine_name}`);
+  if (/burgundy|gevrey|morey|chambolle|vosne|nuits|pommard|volnay|meursault|beaune|bordeaux|pauillac|saint emilion|pessac|rhone|chateauneuf|alsace/.test(text)) return "France";
+  if (/tuscany|brunello|veneto|amarone|sangiovese|montevertine/.test(text)) return "Italy";
+  if (/rioja|ribera|contador|muga|vega sicilia|cvne/.test(text)) return "Spain";
+  if (/napa|sonoma|california|mount veeder|realm|caymus|cakebread/.test(text)) return "USA";
+  if (/waiheke|hawke|new zealand|stonyridge|bell hill/.test(text)) return "New Zealand";
+  if (/barossa|margaret river|australia|penfolds|deep woods|leeuwin|standish/.test(text)) return "Australia";
+  if (/mendoza|catena/.test(text)) return "Argentina";
+  if (/mosel/.test(text)) return "Germany";
+  if (/transylvania|liliac/.test(text)) return "Romania";
+  if (/dao|portugal|kemper/.test(text)) return "Portugal";
+  if (/stellenbosch|de toren/.test(text)) return "South Africa";
+  return known || "Other";
+}
+
+function mapLocationFor(wine) {
+  const text = normalize(`${wine.region} ${wine.appellation} ${wine.vineyard_or_climat} ${wine.wine_name} ${wine.producer}`);
+  const match = MAP_REGION_CENTERS.find(([needle]) => text.includes(needle));
+  const country = mapCountryFor(wine);
+  if (match) return { lat: match[2], lng: match[3], region: match[4], country };
+  const coordinates = MAP_COUNTRIES[country] || [20, 0];
+  return { lat: coordinates[0], lng: coordinates[1], region: wine.region || country, country };
+}
+
+function mapHash(value) {
+  return [...String(value)].reduce((total, char) => ((total << 5) - total) + char.charCodeAt(0), 0) >>> 0;
+}
+
+function mapOffset(record) {
+  const hash = mapHash(record.producer);
+  return [((hash % 17) - 8) * 0.007, (((hash / 17) % 17) - 8) * 0.01];
+}
+
+function mapBubbleIcon(value, type) {
+  return L.divIcon({
+    className: "",
+    html: `<span class="map-bubble ${type}">${value}</span>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
+  });
+}
+
+function mapRecords() {
+  const records = new Map();
+  state.wines.forEach(wine => {
+    const key = normalize(wine.producer);
+    if (!key) return;
+    if (!records.has(key)) records.set(key, { producer: wine.producer, wines: [], notes: [] });
+    records.get(key).wines.push(wine);
+  });
+  state.tastingNotes.forEach(note => {
+    const key = normalize(note.producer);
+    if (!key) return;
+    if (!records.has(key)) records.set(key, { producer: note.producer, wines: [], notes: [] });
+    records.get(key).notes.push(note);
+  });
+  return [...records.values()].map(record => {
+    const anchor = record.wines[0] || record.notes[0];
+    const location = mapLocationFor(anchor);
+    const inStock = record.wines.reduce((total, wine) => total + Number(wine.current_inventory || 0), 0);
+    const onOrder = record.wines.reduce((total, wine) => total + Number(wine.on_order_inventory || 0), 0);
+    return { ...record, ...location, inStock, onOrder, wines: record.wines.sort((a, b) => Number(b.vintage || 0) - Number(a.vintage || 0)) };
+  });
+}
+
+function filteredMapRecords() {
+  const query = normalize($("#wine-map-search").value);
+  const country = $("#wine-map-country").value;
+  return state.wineMap.records.filter(record => {
+    const text = normalize(`${record.producer} ${record.country} ${record.region} ${record.wines.map(wine => `${wine.wine_name} ${wine.appellation}`).join(" ")}`);
+    return (!country || record.country === country) && (!query || text.includes(query));
+  });
+}
+
+function renderMapDetails(record) {
+  const container = $("#wine-map-details");
+  if (!record) {
+    container.innerHTML = `<div class="map-details-empty"><h3>从一杯酒找到一个地方</h3><p>缩放地图：世界视图显示国家，进入后显示产区，继续放大可查看酒庄。</p><p>点击任何酒庄圆点，即可看到库存、运输中和已经喝过的记录。</p></div>`;
+    return;
+  }
+  const noteScores = record.notes.map(note => note.score).filter(score => score !== null && score !== undefined);
+  const averageScore = noteScores.length ? (noteScores.reduce((total, score) => total + Number(score), 0) / noteScores.length).toFixed(1) : "-";
+  const wineRows = record.wines.slice(0, 8).map(wine => {
+    const stock = Number(wine.current_inventory || 0);
+    const ordered = Number(wine.on_order_inventory || 0);
+    return `<div class="map-wine-row"><strong>${escapeHtml(wine.wine_name)} ${wine.vintage || ""}</strong><span>${escapeHtml(wine.appellation || wine.region || "")} · 在库 ${stock}${ordered ? ` · 运输中 ${ordered}` : ""}</span></div>`;
+  }).join("") || '<p class="hint">这家酒庄目前只在品鉴记录中出现。</p>';
+  container.innerHTML = `
+    <h3>${escapeHtml(record.producer)}</h3>
+    <p class="map-subtitle">${escapeHtml(record.region)} · ${escapeHtml(record.country)}</p>
+    <div class="map-stat-grid">
+      <div class="map-stat"><span>在库</span><strong>${record.inStock}</strong></div>
+      <div class="map-stat"><span>运输中</span><strong>${record.onOrder}</strong></div>
+      <div class="map-stat"><span>喝过</span><strong>${record.notes.length || "-"}</strong></div>
+    </div>
+    ${noteScores.length ? `<p class="hint">已记录品鉴平均分：${averageScore}</p>` : ""}
+    <div class="map-wine-list">${wineRows}</div>
+    <button class="map-detail-link" type="button" data-map-producer="${escapeHtml(record.producer)}">在 Inventory 查看这家酒庄</button>
+  `;
+  $("[data-map-producer]", container)?.addEventListener("click", () => {
+    $("#inventory-search").value = record.producer;
+    $("[data-view='inventory']").click();
+  });
+}
+
+function ensureWineMap() {
+  if (state.wineMap.map || !window.L) return;
+  const map = L.map("wine-world-map", { scrollWheelZoom: true, minZoom: 2 }).setView([25, 8], 2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+  state.wineMap.map = map;
+  state.wineMap.layers = { country: L.layerGroup(), region: L.layerGroup(), producer: L.layerGroup() };
+  map.on("zoomend", updateWineMapLayerVisibility);
+  renderMapDetails();
+}
+
+function updateWineMapLayerVisibility() {
+  const { map, layers } = state.wineMap;
+  if (!map || !layers) return;
+  Object.values(layers).forEach(layer => map.removeLayer(layer));
+  const zoom = map.getZoom();
+  if (zoom < 4) layers.country.addTo(map);
+  else if (zoom < 7) layers.region.addTo(map);
+  else layers.producer.addTo(map);
+}
+
+function rebuildWineMapLayers(records) {
+  const { map, layers } = state.wineMap;
+  if (!map || !layers) return;
+  Object.values(layers).forEach(layer => layer.clearLayers());
+  const countryGroups = new Map();
+  const regionGroups = new Map();
+  records.forEach(record => {
+    if (!countryGroups.has(record.country)) countryGroups.set(record.country, []);
+    countryGroups.get(record.country).push(record);
+    const regionKey = `${record.country}|${record.region}`;
+    if (!regionGroups.has(regionKey)) regionGroups.set(regionKey, []);
+    regionGroups.get(regionKey).push(record);
+    const [latOffset, lngOffset] = mapOffset(record);
+    L.marker([record.lat + latOffset, record.lng + lngOffset], { icon: mapBubbleIcon(record.inStock || record.notes.length || 1, "producer") })
+      .bindTooltip(escapeHtml(record.producer), { direction: "top", offset: [0, -18] })
+      .on("click", () => renderMapDetails(record))
+      .addTo(layers.producer);
+  });
+  countryGroups.forEach((group, country) => {
+    const coords = MAP_COUNTRIES[country] || [group[0].lat, group[0].lng];
+    L.marker(coords, { icon: mapBubbleIcon(group.length, "country") })
+      .bindTooltip(`${escapeHtml(country)} · ${group.length} 家酒庄`, { direction: "top" })
+      .on("click", () => map.flyTo(coords, 5, { duration: 0.6 }))
+      .addTo(layers.country);
+  });
+  regionGroups.forEach(group => {
+    const first = group[0];
+    L.marker([first.lat, first.lng], { icon: mapBubbleIcon(group.length, "region") })
+      .bindTooltip(`${escapeHtml(first.region)} · ${group.length} 家酒庄`, { direction: "top" })
+      .on("click", () => map.flyTo([first.lat, first.lng], 8, { duration: 0.6 }))
+      .addTo(layers.region);
+  });
+  updateWineMapLayerVisibility();
+}
+
+function renderWineMap({ fit = false } = {}) {
+  if (!$("#wine-world-map")) return;
+  ensureWineMap();
+  if (!state.wineMap.map) return;
+  state.wineMap.records = mapRecords();
+  const countrySelect = $("#wine-map-country");
+  const selected = countrySelect.value;
+  const countries = [...new Set(state.wineMap.records.map(record => record.country))].sort();
+  countrySelect.innerHTML = '<option value="">全部国家</option>' + countries.map(country => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join("");
+  countrySelect.value = countries.includes(selected) ? selected : "";
+  const records = filteredMapRecords();
+  $("#wine-map-summary").textContent = `${records.length} 家酒庄 · ${new Set(records.map(record => record.region)).size} 个产区`;
+  rebuildWineMapLayers(records);
+  if (fit && records.length) {
+    const bounds = L.latLngBounds(records.map(record => [record.lat, record.lng]));
+    state.wineMap.map.fitBounds(bounds.pad(0.2), { maxZoom: 5 });
+  }
+}
+
+function resetWineMap() {
+  $("#wine-map-search").value = "";
+  $("#wine-map-country").value = "";
+  renderWineMap();
+  state.wineMap.map.setView([25, 8], 2);
+  renderMapDetails();
+}
+
 async function refreshAll() {
   await loadTastingEvents();
   await Promise.all([renderDashboard(), loadWines(), loadCellarLog()]);
@@ -465,6 +710,12 @@ function wireEvents() {
     $$(".view").forEach(v => v.classList.remove("active"));
     tab.classList.add("active");
     $(`#${tab.dataset.view}`).classList.add("active");
+    if (tab.dataset.view === "wine-map") {
+      setTimeout(() => {
+        renderWineMap();
+        state.wineMap.map?.invalidateSize();
+      }, 0);
+    }
   }));
   $('[data-action="refresh"]').addEventListener("click", refreshAll);
   $("#inventory-search").addEventListener("input", renderInventory);
@@ -479,6 +730,9 @@ function wireEvents() {
   $("#recommendation-search").addEventListener("input", renderPortfolioTargets);
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
+  $("#wine-map-search").addEventListener("input", () => renderWineMap({ fit: true }));
+  $("#wine-map-country").addEventListener("change", () => renderWineMap({ fit: true }));
+  $("#wine-map-reset").addEventListener("click", resetWineMap);
 
 }
 

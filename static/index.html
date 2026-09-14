@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kevin Wine Portfolio</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -18,6 +19,7 @@
         <button class="tab" data-view="inventory">Inventory</button>
         <button class="tab" data-view="cellar-log">Cellar Log</button>
         <button class="tab" data-view="tasting-notes">Tasting Notes</button>
+        <button class="tab" data-view="wine-map">世界葡萄酒地图</button>
       </nav>
     </header>
 
@@ -108,9 +110,36 @@
         </div>
       </section>
 
+      <section id="wine-map" class="view">
+        <div class="toolbar">
+          <div>
+            <h2>世界葡萄酒地图</h2>
+            <p class="hint">从国家到产区，再到酒庄，查看酒窖与品鉴足迹。</p>
+          </div>
+          <div class="filters">
+            <input id="wine-map-search" placeholder="搜索国家、产区或酒庄" />
+            <select id="wine-map-country"><option value="">全部国家</option></select>
+            <button id="wine-map-reset" type="button">回到世界地图</button>
+          </div>
+        </div>
+        <div class="wine-map-layout">
+          <div class="map-panel">
+            <div class="map-legend" aria-label="地图层级说明">
+              <span><i class="legend-dot country"></i>国家</span>
+              <span><i class="legend-dot region"></i>产区</span>
+              <span><i class="legend-dot producer"></i>酒庄</span>
+              <span id="wine-map-summary"></span>
+            </div>
+            <div id="wine-world-map" aria-label="世界葡萄酒地图"></div>
+          </div>
+          <aside id="wine-map-details" class="map-details" aria-live="polite"></aside>
+        </div>
+      </section>
+
     </main>
 
     <div id="toast" role="status"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/app.js"></script>
   </body>
 </html>

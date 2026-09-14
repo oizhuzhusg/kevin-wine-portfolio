@@ -271,6 +271,75 @@ tr:hover td { background: #fafafa; }
 .tasting-event li { padding: 3px 0; }
 .tasting-event li span { display: block; margin-top: 2px; }
 .tasting-event p { margin: 9px 0 0; }
+.wine-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: stretch;
+}
+.map-panel, .map-details {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+  overflow: hidden;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.map-legend > span:last-child { margin-left: auto; font-weight: 600; }
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
+.legend-dot.country { background: #29485f; }
+.legend-dot.region { background: var(--gold); }
+.legend-dot.producer { background: var(--accent); }
+#wine-world-map { height: min(68vh, 680px); min-height: 500px; background: #e9eef1; }
+.leaflet-container { font: inherit; }
+.map-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(32, 33, 36, 0.26);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.map-bubble.country { background: #29485f; }
+.map-bubble.region { background: var(--gold); }
+.map-bubble.producer { background: var(--accent); }
+.map-details { padding: 18px; }
+.map-details-empty { color: var(--muted); line-height: 1.6; }
+.map-details h3 { margin-bottom: 5px; font-size: 18px; }
+.map-details .map-subtitle { margin-bottom: 16px; color: var(--muted); font-size: 13px; }
+.map-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.map-stat { border: 1px solid var(--line); border-radius: 6px; padding: 9px; }
+.map-stat span { display: block; color: var(--muted); font-size: 11px; font-weight: 700; }
+.map-stat strong { display: block; margin-top: 2px; font-size: 19px; }
+.map-wine-list { display: grid; gap: 8px; }
+.map-wine-row { border-top: 1px solid var(--line); padding-top: 10px; }
+.map-wine-row:first-child { border-top: 0; padding-top: 0; }
+.map-wine-row strong { display: block; font-size: 13px; line-height: 1.35; }
+.map-wine-row span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.map-detail-link { display: inline-flex; margin-top: 14px; color: var(--accent); font-size: 13px; font-weight: 750; text-decoration: none; cursor: pointer; }
 .star-rating {
   display: inline-flex;
   gap: 2px;
@@ -308,6 +377,8 @@ code { background: #eceff3; padding: 2px 4px; border-radius: 4px; }
 @media (max-width: 980px) {
   .topbar { align-items: start; flex-direction: column; }
   .two-col, .bars, .metric-grid { grid-template-columns: 1fr; }
+  .wine-map-layout { grid-template-columns: 1fr; }
+  .map-details { min-height: 180px; }
 }
 
 @media (max-width: 620px) {
@@ -332,6 +403,9 @@ code { background: #eceff3; padding: 2px 4px; border-radius: 4px; }
   .filters { display: grid; grid-template-columns: 1fr; width: 100%; }
   .filters > input, .filters > select { min-width: 0; }
   .panel { padding: 12px; }
+  #wine-world-map { height: 52vh; min-height: 390px; }
+  .map-legend { gap: 8px; padding: 9px 10px; }
+  .map-legend > span:last-child { width: 100%; margin-left: 0; }
   .grid-form, fieldset { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .metric { padding: 12px; font-size: 12px; }
