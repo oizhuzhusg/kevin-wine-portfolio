@@ -119,6 +119,7 @@
           <div class="filters">
             <input id="wine-map-search" placeholder="搜索国家、产区或酒庄" />
             <select id="wine-map-country"><option value="">全部国家</option></select>
+            <label class="map-toggle"><input id="wine-map-all-wineries" type="checkbox" checked /> 公开酒庄</label>
             <button id="wine-map-reset" type="button">回到世界地图</button>
           </div>
         </div>
@@ -127,7 +128,8 @@
             <div class="map-legend" aria-label="地图层级说明">
               <span><i class="legend-dot country"></i>国家</span>
               <span><i class="legend-dot region"></i>产区</span>
-              <span><i class="legend-dot producer"></i>酒庄</span>
+              <span><i class="legend-dot producer"></i>我的酒庄</span>
+              <span><i class="legend-dot public"></i>公开酒庄</span>
               <span id="wine-map-summary"></span>
             </div>
             <div id="wine-world-map" aria-label="世界葡萄酒地图"></div>

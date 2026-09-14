@@ -89,6 +89,51 @@ const json = (value, status = 200) => new Response(JSON.stringify(value), {
   headers: { "Content-Type": "application/json; charset=utf-8" }
 });
 
+const WORLD_WINERY_CACHE_SECONDS = 60 * 60 * 24 * 7;
+
+function validBbox(value) {
+  const parts = String(value || "").split(",").map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isFinite(part))) return null;
+  const [south, west, north, east] = parts;
+  if (south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
+  // Keep public Overpass queries focused on a vineyard-scale map view.
+  if (north - south > 3 || east - west > 3) return null;
+  return parts;
+}
+
+async function publicWineries(request, url) {
+  const bbox = validBbox(url.searchParams.get("bbox"));
+  if (!bbox) return json({ error: "Zoom in before loading public wineries" }, 400);
+  const cacheKey = new Request(`${url.origin}/api/world-wineries?bbox=${bbox.map(value => value.toFixed(3)).join(",")}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return cached;
+
+  const [south, west, north, east] = bbox;
+  const query = `[out:json][timeout:20];(node["craft"="winery"](${south},${west},${north},${east});way["craft"="winery"](${south},${west},${north},${east});relation["craft"="winery"](${south},${west},${north},${east}););out center tags;`;
+  const response = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+    body: new URLSearchParams({ data: query }).toString()
+  });
+  if (!response.ok) return json({ error: "Public winery data is temporarily unavailable" }, 502);
+  const payload = await response.json();
+  const wineries = (payload.elements || [])
+    .map(element => ({
+      id: `${element.type}/${element.id}`,
+      name: element.tags?.name || element.tags?.brand || "Unnamed winery",
+      lat: element.lat ?? element.center?.lat,
+      lng: element.lon ?? element.center?.lon,
+      website: element.tags?.website || null,
+      wikidata: element.tags?.wikidata || null
+    }))
+    .filter(winery => Number.isFinite(winery.lat) && Number.isFinite(winery.lng))
+    .slice(0, 1000);
+  const result = json({ wineries, source: "OpenStreetMap", cached_for_seconds: WORLD_WINERY_CACHE_SECONDS });
+  result.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
+  await caches.default.put(cacheKey, result.clone());
+  return result;
+}
+
 const parseTags = (value) => {
   try { return JSON.parse(value || "[]"); } catch { return []; }
 };
@@ -232,6 +277,7 @@ async function dashboard(env) {
 
 async function api(request, env, pathname) {
   if (pathname === "/api/lookups" && request.method === "GET") return json({ categories: CATEGORIES, colors: COLORS, watchlist: [] });
+  if (pathname === "/api/world-wineries" && request.method === "GET") return publicWineries(request, new URL(request.url));
   if (pathname === "/api/dashboard" && request.method === "GET") return json(await dashboard(env));
   if (pathname === "/api/tasting-events" && request.method === "GET") {
     const events = (await env.DB.prepare("SELECT * FROM tasting_events ORDER BY event_date ASC, id ASC").all()).results;

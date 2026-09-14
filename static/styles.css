@@ -307,6 +307,16 @@ tr:hover td { background: #fafafa; }
 .legend-dot.country { background: #29485f; }
 .legend-dot.region { background: var(--gold); }
 .legend-dot.producer { background: var(--accent); }
+.legend-dot.public { background: #496377; }
+.map-toggle {
+  display: inline-flex;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.map-toggle input { width: auto; }
 #wine-world-map { height: min(68vh, 680px); min-height: 500px; background: #e9eef1; }
 .leaflet-container { font: inherit; }
 .map-bubble {
@@ -326,6 +336,14 @@ tr:hover td { background: #fafafa; }
 .map-bubble.country { background: #29485f; }
 .map-bubble.region { background: var(--gold); }
 .map-bubble.producer { background: var(--accent); }
+.public-winery-marker {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #496377;
+  box-shadow: 0 1px 5px rgba(32, 33, 36, 0.26);
+}
 .map-details { padding: 18px; }
 .map-details-empty { color: var(--muted); line-height: 1.6; }
 .map-details h3 { margin-bottom: 5px; font-size: 18px; }
