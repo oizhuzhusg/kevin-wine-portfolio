@@ -91,66 +91,85 @@ const json = (value, status = 200) => new Response(JSON.stringify(value), {
 
 const WORLD_WINERY_CACHE_SECONDS = 60 * 60 * 24 * 7;
 
+const PUBLIC_WINE_COUNTRY_CODES = new Set([
+  "AR", "AT", "AU", "CL", "DE", "ES", "FR", "GR", "HU", "IT", "NZ", "PT", "RO", "US", "ZA"
+]);
+
 function validBbox(value) {
   const parts = String(value || "").split(",").map(Number);
   if (parts.length !== 4 || parts.some(part => !Number.isFinite(part))) return null;
   const [south, west, north, east] = parts;
   if (south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
-  // Keep public Overpass queries focused on a vineyard-scale map view.
+  // Keep public winery responses focused on a vineyard-scale map view.
   if (north - south > 3 || east - west > 3) return null;
   return parts;
+}
+
+function geometryCenter(geometry) {
+  if (!geometry?.coordinates) return null;
+  if (geometry.type === "Point") {
+    const [lng, lat] = geometry.coordinates;
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+  const points = [];
+  const collect = value => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") points.push(value);
+    else value.forEach(collect);
+  };
+  collect(geometry.coordinates);
+  if (!points.length) return null;
+  const [lng, lat] = points.reduce((sum, point) => [sum[0] + point[0], sum[1] + point[1]], [0, 0]);
+  return { lat: lat / points.length, lng: lng / points.length };
+}
+
+async function countryWineryData(url, countryCode) {
+  const cacheKey = new Request(`${url.origin}/api/world-wineries/cache/${countryCode}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return cached.json();
+
+  const source = `https://raw.githubusercontent.com/openhistorymap/openwinemap/main/data/countries/${countryCode}.geojson`;
+  const response = await fetch(source, { headers: { "Accept": "application/geo+json,application/json" } });
+  if (!response.ok) throw new Error("Public winery source unavailable");
+  const payload = await response.json();
+  const wineries = (payload.features || [])
+    .filter(feature => feature.properties?.category === "winery")
+    .map(feature => {
+      const point = geometryCenter(feature.geometry);
+      const tags = feature.properties?.tags || {};
+      return point && {
+        id: `${feature.properties?.osm_type || "node"}/${feature.properties?.osm_id || feature.id || ""}`,
+        name: feature.properties?.name || tags.name || tags.brand || "Unnamed winery",
+        ...point,
+        website: tags.website || null,
+        wikidata: tags.wikidata || null
+      };
+    })
+    .filter(Boolean);
+  const result = { wineries, source: "Open Wine Map / OpenStreetMap" };
+  const cachedResponse = json(result);
+  cachedResponse.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
+  await caches.default.put(cacheKey, cachedResponse.clone());
+  return result;
 }
 
 async function publicWineries(request, url) {
   const bbox = validBbox(url.searchParams.get("bbox"));
   if (!bbox) return json({ error: "Zoom in before loading public wineries" }, 400);
-  const cacheKey = new Request(`${url.origin}/api/world-wineries?bbox=${bbox.map(value => value.toFixed(3)).join(",")}`);
-  const cached = await caches.default.match(cacheKey);
-  if (cached) return cached;
-
+  const countryCode = String(url.searchParams.get("country") || "").toUpperCase();
+  if (!PUBLIC_WINE_COUNTRY_CODES.has(countryCode)) return json({ error: "Choose a supported country before loading public wineries" }, 400);
   const [south, west, north, east] = bbox;
-  const query = `[out:json][timeout:20];(node["craft"="winery"](${south},${west},${north},${east});way["craft"="winery"](${south},${west},${north},${east});relation["craft"="winery"](${south},${west},${north},${east}););out center tags;`;
-  const endpoints = [
-    "https://overpass.private.coffee/api/interpreter",
-    "https://overpass.osm.ch/api/interpreter",
-    "https://overpass-api.de/api/interpreter"
-  ];
-  let response;
-  for (const endpoint of endpoints) {
-    try {
-      const candidate = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "User-Agent": "KevinWinePortfolio/1.0 (personal wine map)"
-        },
-        body: new URLSearchParams({ data: query }).toString()
-      });
-      if (candidate.ok) {
-        response = candidate;
-        break;
-      }
-    } catch {
-      // Try the next public mirror without exposing infrastructure details to the visitor.
-    }
+  try {
+    const countryData = await countryWineryData(url, countryCode);
+    const wineries = countryData.wineries
+      .filter(winery => winery.lat >= south && winery.lat <= north && winery.lng >= west && winery.lng <= east)
+      .slice(0, 1000);
+    const result = json({ wineries, source: countryData.source, cached_for_seconds: WORLD_WINERY_CACHE_SECONDS });
+    result.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
+    return result;
+  } catch {
+    return json({ error: "Public winery data is temporarily unavailable" }, 502);
   }
-  if (!response) return json({ error: "Public winery data is temporarily unavailable" }, 502);
-  const payload = await response.json();
-  const wineries = (payload.elements || [])
-    .map(element => ({
-      id: `${element.type}/${element.id}`,
-      name: element.tags?.name || element.tags?.brand || "Unnamed winery",
-      lat: element.lat ?? element.center?.lat,
-      lng: element.lon ?? element.center?.lon,
-      website: element.tags?.website || null,
-      wikidata: element.tags?.wikidata || null
-    }))
-    .filter(winery => Number.isFinite(winery.lat) && Number.isFinite(winery.lng))
-    .slice(0, 1000);
-  const result = json({ wineries, source: "OpenStreetMap", cached_for_seconds: WORLD_WINERY_CACHE_SECONDS });
-  result.headers.set("Cache-Control", `public, max-age=${WORLD_WINERY_CACHE_SECONDS}`);
-  await caches.default.put(cacheKey, result.clone());
-  return result;
 }
 
 const parseTags = (value) => {

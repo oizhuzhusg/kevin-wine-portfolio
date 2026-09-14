@@ -5,7 +5,7 @@ const state = {
   tastingEvents: [],
   cellarLog: [],
   tastingNotes: [],
-  wineMap: { map: null, layers: null, records: [], publicWineries: [], publicQueryKey: "", publicLoading: false, publicTimer: null }
+  wineMap: { map: null, layers: null, records: [], publicWineries: [], publicQueryKey: "", publicCountry: "", publicLoading: false, publicTimer: null }
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -463,6 +463,12 @@ const MAP_COUNTRIES = {
   Austria: [47.52, 14.55], Hungary: [47.16, 19.5], Greece: [39.07, 21.82]
 };
 
+const PUBLIC_WINE_COUNTRY_CODES = {
+  Argentina: "AR", Australia: "AU", Austria: "AT", Chile: "CL", France: "FR", Germany: "DE", Greece: "GR",
+  Hungary: "HU", Italy: "IT", "New Zealand": "NZ", Portugal: "PT", Romania: "RO", "South Africa": "ZA",
+  Spain: "ES", USA: "US"
+};
+
 const MAP_REGION_CENTERS = [
   ["gevrey-chambertin", "热夫雷-香贝丹", 47.226, 4.973, "Burgundy"],
   ["morey-saint-denis", "莫雷-圣但尼", 47.202, 4.985, "Burgundy"],
@@ -631,10 +637,10 @@ function renderPublicWineryDetails(winery) {
   const personal = state.wineMap.records.find(record => normalize(record.producer) === normalize(winery.name));
   container.innerHTML = `
     <h3>${escapeHtml(winery.name)}</h3>
-    <p class="map-subtitle">公开酒庄资料 · OpenStreetMap</p>
+    <p class="map-subtitle">公开酒庄资料 · Open Wine Map / OpenStreetMap</p>
     <p class="hint">这个点位来自公开地图资料，代表酒庄或酿造地点，不等同于其拥有的全部葡萄园地块。</p>
     ${personal ? `<button class="map-detail-link" type="button" data-map-personal-producer="${escapeHtml(personal.producer)}">查看我的酒窖记录</button>` : ""}
-    <a class="map-detail-link" href="https://www.openstreetmap.org/${encodeURIComponent(winery.id)}" target="_blank" rel="noreferrer">在 OpenStreetMap 查看位置</a>
+    <a class="map-detail-link" href="https://www.openstreetmap.org/${winery.id}" target="_blank" rel="noreferrer">在 OpenStreetMap 查看位置</a>
   `;
   $("[data-map-personal-producer]", container)?.addEventListener("click", () => renderMapDetails(personal));
 }
@@ -644,9 +650,10 @@ function renderPublicWineryLayer() {
   if (!layers) return;
   layers.public.clearLayers();
   if (!$("#wine-map-all-wineries")?.checked) return;
+  const query = normalize($("#wine-map-search").value);
   const personalProducers = new Set(state.wineMap.records.map(record => normalize(record.producer)));
   state.wineMap.publicWineries
-    .filter(winery => !personalProducers.has(normalize(winery.name)))
+    .filter(winery => !personalProducers.has(normalize(winery.name)) && (!query || normalize(winery.name).includes(query)))
     .forEach(winery => {
       L.marker([winery.lat, winery.lng], { icon: publicWineryIcon(), keyboard: true })
         .bindTooltip(escapeHtml(winery.name), { direction: "top", offset: [0, -8] })
@@ -669,15 +676,19 @@ function publicWineryBounds() {
 async function loadPublicWineries() {
   const { map } = state.wineMap;
   if (!map || map.getZoom() < 8 || !$("#wine-map-all-wineries")?.checked) return;
+  const country = $("#wine-map-country").value;
+  const countryCode = PUBLIC_WINE_COUNTRY_CODES[country];
+  if (!countryCode) return;
   const bounds = publicWineryBounds();
   if (!bounds) return;
-  const queryKey = bounds.map(value => value.toFixed(2)).join(",");
+  const queryKey = `${countryCode}|${bounds.map(value => value.toFixed(2)).join(",")}`;
   if (queryKey === state.wineMap.publicQueryKey || state.wineMap.publicLoading) return;
   state.wineMap.publicLoading = true;
   try {
-    const data = await api(`/api/world-wineries?bbox=${encodeURIComponent(bounds.join(","))}`);
+    const data = await api(`/api/world-wineries?country=${countryCode}&bbox=${encodeURIComponent(bounds.join(","))}`);
     state.wineMap.publicWineries = Array.isArray(data.wineries) ? data.wineries : [];
     state.wineMap.publicQueryKey = queryKey;
+    state.wineMap.publicCountry = countryCode;
     renderPublicWineryLayer();
     updateWineMapLayerVisibility();
     renderWineMapSummary();
@@ -697,7 +708,7 @@ function renderWineMapSummary(records = filteredMapRecords()) {
   const publicCount = state.wineMap.publicWineries.length;
   const publicText = publicCount
     ? ` · 当前范围 ${publicCount} 家公开酒庄`
-    : " · 放大地图加载公开酒庄";
+    : $("#wine-map-country").value ? " · 放大地图加载公开酒庄" : " · 选择国家后加载公开酒庄";
   $("#wine-map-summary").textContent = `我的 ${records.length} 家酒庄 · ${new Set(records.map(record => record.region)).size} 个产区${publicText}`;
 }
 
@@ -750,7 +761,11 @@ function rebuildWineMapLayers(records) {
     const coords = MAP_COUNTRIES[country] || [group[0].lat, group[0].lng];
     L.marker(coords, { icon: mapBubbleIcon(group.length, "country") })
       .bindTooltip(`${escapeHtml(country)} · ${group.length} 家酒庄`, { direction: "top" })
-      .on("click", () => map.flyTo(coords, 5, { duration: 0.6 }))
+      .on("click", () => {
+        $("#wine-map-country").value = country;
+        renderWineMap();
+        map.flyTo(coords, 5, { duration: 0.6 });
+      })
       .addTo(layers.country);
   });
   regionGroups.forEach(group => {
@@ -771,7 +786,7 @@ function renderWineMap({ fit = false } = {}) {
   state.wineMap.records = mapRecords();
   const countrySelect = $("#wine-map-country");
   const selected = countrySelect.value;
-  const countries = [...new Set(state.wineMap.records.map(record => record.country))].sort();
+  const countries = [...new Set([...Object.keys(PUBLIC_WINE_COUNTRY_CODES), ...state.wineMap.records.map(record => record.country)])].sort();
   countrySelect.innerHTML = '<option value="">全部国家</option>' + countries.map(country => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join("");
   countrySelect.value = countries.includes(selected) ? selected : "";
   const records = filteredMapRecords();
@@ -826,7 +841,14 @@ function wireEvents() {
   $("#recommendation-region").addEventListener("change", renderPortfolioTargets);
   $("#recommendation-color").addEventListener("change", renderPortfolioTargets);
   $("#wine-map-search").addEventListener("input", () => renderWineMap({ fit: true }));
-  $("#wine-map-country").addEventListener("change", () => renderWineMap({ fit: true }));
+  $("#wine-map-country").addEventListener("change", () => {
+    state.wineMap.publicWineries = [];
+    state.wineMap.publicQueryKey = "";
+    const country = $("#wine-map-country").value;
+    renderWineMap();
+    const coords = MAP_COUNTRIES[country];
+    if (coords) state.wineMap.map?.flyTo(coords, 5, { duration: 0.6 });
+  });
   $("#wine-map-all-wineries").addEventListener("change", () => {
     renderPublicWineryLayer();
     updateWineMapLayerVisibility();
