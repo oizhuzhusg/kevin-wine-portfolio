@@ -101,7 +101,7 @@ function validBbox(value) {
   const [south, west, north, east] = parts;
   if (south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
   // Keep public winery responses focused on a vineyard-scale map view.
-  if (north - south > 3 || east - west > 3) return null;
+  if (north - south > 5 || east - west > 5) return null;
   return parts;
 }
 
