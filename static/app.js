@@ -797,7 +797,7 @@ function rebuildWineMapLayers(records) {
   });
   countryGroups.forEach((group, country) => {
     const coords = MAP_COUNTRIES[country] || [group[0].lat, group[0].lng];
-    L.marker(coords, { icon: mapBubbleIcon(`${country} · ${group.length}`, "country", true) })
+    L.marker(coords, { icon: mapBubbleIcon(group.length, "country") })
       .bindTooltip(`${escapeHtml(country)} · ${group.length} 家酒庄`, { direction: "top" })
       .on("click", () => {
         $("#wine-map-country").value = country;
